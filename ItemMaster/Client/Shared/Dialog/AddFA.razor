@@ -1,0 +1,26 @@
+﻿@using MudBlazor
+
+<MudDialog>
+    <MudDialogTitle>Add New FA</MudDialogTitle>
+    <MudDialogContent>
+        <!-- Your form content here -->
+    </MudDialogContent>
+    <MudDialogActions>
+        <MudButton OnClick="CloseDialog" Color="Color.Primary">Save</MudButton>
+        <MudButton OnClick="CancelDialog" Color="Color.Secondary">Cancel</MudButton>
+    </MudDialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; }
+
+    private void CloseDialog()
+    {
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    private void CancelDialog()
+    {
+        MudDialog.Cancel();
+    }
+}

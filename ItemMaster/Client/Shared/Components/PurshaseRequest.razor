@@ -1,0 +1,118 @@
+﻿@inject IFaClient _faClient
+@inject IDialogService DialogService
+
+<MudDialog Style="zoom:90%">
+	<TitleContent>
+		<MudText Typo="Typo.h6">
+			<MudIcon Icon="@Icons.Material.Filled.UploadFile" Class="mr-3" /> Purchase Request Detail By @ringisho
+		</MudText>
+	</TitleContent>
+	<DialogContent>
+		<MudTable Items="@PrVms" Loading=_loading Dense=true Hover="true" Bordered="true" Striped="false" RowClassFunc="GetRowClass">
+			<ToolBarContent>
+				<MudText Typo="Typo.h6">@ringisho</MudText>
+				</ToolBarContent>
+				<HeaderContent>
+					<MudTh>No</MudTh>
+					<MudTh>PR No</MudTh>
+					<MudTh>PO No</MudTh>
+					<MudTh>Invoice No</MudTh>
+					<MudTh>Invoice Date</MudTh>
+					<MudTh>Section</MudTh>
+					<MudTh>Issue Date</MudTh>
+					<MudTh>Issue By</MudTh>
+					<MudTh>Receive Date</MudTh>
+					<MudTh>Ringisho No</MudTh>
+					<MudTh>Budget No</MudTh>
+					<MudTh>Remark</MudTh>
+					<MudTh></MudTh>
+				</HeaderContent>
+				<RowTemplate >
+					<MudTd>@context.RowNum</MudTd>
+					<MudTd>@context.PRNo</MudTd>
+					<MudTd Style="color:green;">@context.PONo</MudTd>
+					<MudTd>@context.InvoiceNo</MudTd>
+					<MudTd>@Convert.ToDateTime(context.InvoiceDate).ToString("dd/MM/yyyy")</MudTd>
+					<MudTd>@context.Section</MudTd>
+					<MudTd>@Convert.ToDateTime(context.IssueDate).ToString("dd/MM/yyyy")</MudTd>
+					<MudTd>@context.IssueBy</MudTd>
+					<MudTd>@Convert.ToDateTime(context.ReceiveDate).ToString("dd/MM/yyyy")</MudTd>
+					<MudTd>@context.RingishoNo</MudTd>
+					<MudTd>@context.BudgetNo</MudTd>
+					<MudTd>@context.Remark</MudTd>
+					<MudTd DataLabel="Name">
+
+						<MudTooltip Text="Show Detail" Color="Color.Info" Placement="Placement.Top">
+							<MudIconButton Icon="@Icons.Material.Outlined.RemoveRedEye" Size="Size.Small" OnClick="@(() => OpenDialogAsync(context.PRNo))" aria-label="Show"></MudIconButton>
+						</MudTooltip>
+					</MudTd>
+				</RowTemplate>
+				<FooterContent>
+					<MudTFootRow Class="header-centered">
+						@if (PrVms == null)
+					{
+						<MudProgressCircular Color="Color.Info" Indeterminate="true" Size="Size.Small" />
+					}
+					else if (PrVms.Count() == 0)
+					{
+
+						<MudTd colspan="13" Style="text-align:center">Purchase request not found</MudTd>
+					}
+					else
+					{
+
+					}
+				</MudTFootRow>
+			</FooterContent>
+			<PagerContent>
+				<MudTablePager />
+			</PagerContent>
+
+		</MudTable>
+
+	</DialogContent>
+	<DialogActions>
+		@* <MudButton OnClick="Cancel">Cancel</MudButton> *@
+		<MudButton Color="Color.Primary" OnClick="Submit">Ok</MudButton>
+	</DialogActions>
+</MudDialog>
+
+@code {
+	public List<PrVm> PrVms { get; set; }
+
+	[Parameter]
+	public string ringisho { get; set; }
+
+	[CascadingParameter]
+	private MudDialogInstance MudDialog { get; set; }
+	private bool _loading { get; set; } = false;
+	private void Submit() => MudDialog.Close(DialogResult.Ok(true));
+
+	private void Cancel() => MudDialog.Cancel();
+
+	protected override async Task OnParametersSetAsync()
+	{
+		_loading = true;
+		StateHasChanged();
+		var favms = await _faClient.GetPurchaseVmAsync(ringisho);
+		PrVms = favms.Data;
+		_loading = false;
+		StateHasChanged();
+	}
+
+	private async Task OpenDialogAsync(string prNo)
+	{
+		var options = new DialogOptions { CloseButton = true, CloseOnEscapeKey = true, DisableBackdropClick = true, MaxWidth = MaxWidth.ExtraExtraLarge, FullWidth = true };
+		var parameters = new DialogParameters { ["PRNo"] = prNo };
+
+		var dialog = DialogService.Show<PRDetail>("PurshaseRequest Detail", parameters, options);
+
+
+		Console.WriteLine("Dialog");
+	}
+	private string GetRowClass(PrVm item, int index)
+	{
+		// index có thể được dùng nếu bạn muốn style thêm dựa trên thứ tự dòng
+		return item.Status == 1 ? "highlight-row" : string.Empty;
+	}
+}

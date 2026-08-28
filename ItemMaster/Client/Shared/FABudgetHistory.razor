@@ -1,0 +1,98 @@
+﻿@page "/budget-history/"
+@inject HttpClient Http
+@using System.Text.Json;
+
+
+@if (budgetHistoryList == null )
+{
+	@* <MudProgressCircular Color="Color.Default" Indeterminate="true" Size="Size.Small" /> *@
+	<MudText>No change history available for this budget.</MudText>
+}
+else if (!budgetHistoryList.Any())
+{
+	<MudText>No change history available for this budget.</MudText>
+}
+else
+{
+	<MudTable Items="budgetHistoryList" Hover="true" Dense="true" Bordered="true" Striped="true" Class="zoomable-content">
+		<ToolBarContent>
+			<MudText Typo="Typo.h6">Update Hisory</MudText>
+			<MudSpacer />
+		</ToolBarContent>
+		<HeaderContent>
+			<MudTh>Budget No</MudTh>
+			<MudTh>Change Date</MudTh>
+			<MudTh>Changed By</MudTh>
+			<MudTh>Old Values</MudTh>
+			<MudTh>New Values</MudTh>
+		</HeaderContent>
+		<RowTemplate>
+			<MudTd DataLabel="Budget No">@context.No</MudTd>
+				<MudTd DataLabel="Change Date">@Convert.ToDateTime(context.ChangeDate).ToString("dd/MM/yyyy HH:mm:ss")</MudTd>
+				<MudTd DataLabel="Changed By">@context.ChangedBy</MudTd>
+				<MudTd DataLabel="Old Values">
+					<MudExpansionPanels Dense=true>
+						<MudExpansionPanel Text="View Old Values">
+							@* <MudText>@(PrettyPrintJson(context.OldValue))</MudText> *@
+							<pre>@(PrettyPrintJson(context?.OldValue))</pre>
+						</MudExpansionPanel>
+					</MudExpansionPanels>
+				</MudTd>
+				<MudTd DataLabel="New Values">
+					<MudExpansionPanels Dense=true>
+						<MudExpansionPanel Text="View New Values">
+							@* <MudText>@(PrettyPrintJson(context.NewValue))</MudText> *@
+							<pre>@( PrettyPrintJson(context?.NewValue))</pre>
+						</MudExpansionPanel>
+					</MudExpansionPanels>
+				</MudTd>
+			</RowTemplate>
+			<PagerContent>
+				<MudTablePager />
+			</PagerContent>
+		</MudTable>
+
+
+}
+
+@code {
+	[Parameter]
+	public List<FAbudgetHistoryListVm>? budgetHistoryList { get; set; }
+
+	protected override async Task OnInitializedAsync()
+	{
+		budgetHistoryList = budgetHistoryList;
+
+	}
+	private string PrettyPrintJson(string? jsonString)
+	{
+
+		if (string.IsNullOrEmpty(jsonString))
+		{
+			return string.Empty;
+		}
+
+		try
+		 {
+		// 	var jsonElement = JsonSerializer.Deserialize<FABudgetVm>(jsonString);
+
+		// 	return JsonSerializer.Serialize(jsonElement, new JsonSerializerOptions { WriteIndented = true });
+
+			using (JsonDocument doc = JsonDocument.Parse(jsonString))
+			{
+			//	return JsonSerializer.Serialize(doc.RootElement, new JsonSerializerOptions { WriteIndented = true });
+
+
+				// Chuyển đổi thành JSON, giải mã Unicode để hiển thị tiếng Nhật
+				var serializedJson = JsonSerializer.Serialize(doc.RootElement, new JsonSerializerOptions { WriteIndented = true });
+
+				// Sử dụng phương thức này để giải mã các ký tự Unicode thành chữ
+				return System.Text.RegularExpressions.Regex.Unescape(serializedJson);
+			}
+		}
+		catch (Exception)
+		{
+			return jsonString; // Nếu không phải là JSON hợp lệ, trả về chuỗi gốc.
+		}
+	}
+}

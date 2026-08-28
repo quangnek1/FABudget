@@ -1,0 +1,63 @@
+﻿
+@page "/pages/authentication/forgot-password"
+@layout LoginLayout
+@inject NavigationManager Navigation
+@inject IAuthService AuthService
+
+
+<MudForm @ref="form" @onkeydown="@EnterKey">
+    <MudText Typo="Typo.h4" GutterBottom="true">Forgot Password?</MudText>
+
+    <MudText Typo="Typo.subtitle2">Enter the email address linked to your account and you will recieve an email containing a link to reset your password.</MudText>
+
+    <MudTextField T="string" Label="E-mail" @bind-Value="@Email" Variant="Variant.Outlined" Class="my-4"></MudTextField>
+
+    @if (loading == true)
+    {
+        <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+    }
+    else
+    {
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large" FullWidth="true" Class="mt-3" OnClick="() => HandleSubmit()">Reset Password</MudButton>
+    }
+</MudForm>
+
+@code {
+    string Email { get; set; }
+    bool loading = false;
+    MudForm form;
+
+    private async Task EnterKey(KeyboardEventArgs e)
+    {
+        if (e.Code == "Enter" || e.Code == "NumpadEnter")
+        {
+            var model = new InputModel
+                {
+                    Email = Email,
+                    Code = Navigation.BaseUri + "pages/authentication/reset-password?token=" // url redirect
+                };
+            await Post(model);
+        }
+    }
+    private async Task HandleSubmit()
+    {
+        var model = new InputModel
+            {
+                Email = Email,
+                Code = Navigation.BaseUri + "pages/authentication/reset-password?token="
+            };
+        await Post(model);
+    }
+    private async Task Post(InputModel model)
+    {
+        loading = true;
+        StateHasChanged();
+        var result = await AuthService.ForgotPasswordAsync(model);
+        loading = false;
+        if (result.IsSuccess)
+        {
+            Navigation.NavigateTo("/pages/authentication/ConfirmForgotPassword");
+        }
+    }
+}
+

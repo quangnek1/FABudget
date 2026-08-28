@@ -1,0 +1,70 @@
+﻿/*#app {
+    position: absolute;
+    top: calc(50% - 3px);
+    left: calc(50% - 250px);
+    width: 500px;
+    height: 6px;
+    background-color: white;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2)
+}
+
+#app::after {
+    content: '';
+    display: block;
+    width: 200px;
+    height: 100%;
+    background-color: #dc105a;
+    animation: progressbar-slide 1s infinite;
+    animation-timing-function: ease-in-out;
+}*/
+/* Zoom cho phần nội dung table */
+.zoomable-content {
+    zoom:  70%
+}
+
+/* Toolbar không bị zoom */
+.no-zoom {
+    zoom: 100%; /* Giữ nguyên không zoom */
+}
+.loading-bar {
+    position: absolute;
+    top: calc(50% - 3px);
+    left: calc(50% - 250px);
+    width: 500px;
+    height: 6px;
+    background-color: white;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2)
+}
+
+    .loading-bar::after {
+        content: '';
+        display: block;
+        width: 200px;
+        height: 100%;
+        background-color: forestgreen;
+        animation: progressbar-slide 1s infinite;
+        animation-timing-function: ease-in-out;
+    }
+@keyframes progressbar-slide {
+    0% {
+        transform: translateX(-200px);
+    }
+
+    50% {
+        transform: translateX(300px);
+    }
+
+    100% {
+        transform: translateX(700px);
+    }
+}
+
+.highlight-row {
+    background-color: #d3f4d3; /* Màu xanh nhạt */
+}
+.highlight-rowExis {
+    background-color: bisque; /* Màu xanh nhạt */
+}
+

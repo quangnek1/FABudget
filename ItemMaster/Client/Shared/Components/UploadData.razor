@@ -1,0 +1,176 @@
+﻿@inject IFaClient _faClient
+@using System.Text.Json;
+@using System.Text;
+
+<MudDialog Style="zoom:90%">
+	<TitleContent>
+		<MudText Typo="Typo.h6">
+			<MudIcon Icon="@Icons.Material.Filled.UploadFile" Class="mr-3" /> Upload Data
+		</MudText>
+	</TitleContent>
+	<DialogContent>
+		<MudGrid>
+			<MudItem xs="6">
+				<InputFile id="fileInput" OnChange="UploadFiles" hidden accept=".csv, .xls, .xlsx" />
+				<MudButton HtmlTag="label"
+						   Color="Color.Info"
+						   Variant="Variant.Filled"
+						   StartIcon="@Icons.Material.Filled.CloudUpload"
+						   for="fileInput">
+					Upload File
+				</MudButton>
+				@if (files != null)
+				{
+					@* 	<MudText Typo="@Typo.h6">@files.Count() File@(files.Count() == 1 ? "" : "s"):</MudText> *@
+					<MudList>
+						@foreach (var file in files)
+						{
+							<MudListItem Icon="@Icons.Material.Filled.AttachFile" @key="@file">
+								@file.Name <code>@file.Size bytes</code>
+							</MudListItem>
+						}
+					</MudList>
+				}
+			</MudItem>
+			<MudItem xs="6">
+
+			</MudItem>
+		</MudGrid>
+		<MudTable Items="@DataUploadVms" Loading=_loading Dense=true Hover="true" Bordered="true" Striped="false" Height="500px" FixedHeader="true" RowClassFunc="GetRowClass">
+			<HeaderContent>
+				<MudTh>PRNo</MudTh>
+				<MudTh>No</MudTh>
+				<MudTh>Item</MudTh>
+				<MudTh>Doc.Curr</MudTh>
+				<MudTh>Curr</MudTh>
+				<MudTh>Loc.Curr</MudTh>
+				<MudTh>Curr</MudTh>
+				<MudTh>Quantity</MudTh>
+				<MudTh>Unit</MudTh>
+				@* <MudTh>Status</MudTh> *@
+			</HeaderContent>
+			<RowTemplate>
+					<MudTd>@context.PR</MudTd>
+					<MudTd>@context.PO</MudTd>
+					<MudTd>@context.Item</MudTd>
+					<MudTd>@string.Format(new System.Globalization.CultureInfo("en-US"), "{0:#,##0.00}", @context.Amount)</MudTd>
+					<MudTd>@context.Currency</MudTd>
+					<MudTd>@context.AmountInLocalCurrency</MudTd>
+					<MudTd>@string.Format(new System.Globalization.CultureInfo("en-US"), "{0:#,##0.00}", @context.LocalCurrency)</MudTd>
+					<MudTd>@context.Quantity</MudTd>
+					<MudTd>@context.Unit</MudTd>
+					@* <MudTd>@context.Status</MudTd> *@
+				</RowTemplate>
+				<FooterContent>
+					<MudTFootRow Class="header-centered">
+					</MudTFootRow>
+				</FooterContent>
+				<PagerContent>
+					<MudTablePager />
+				</PagerContent>
+
+			</MudTable>
+
+		</DialogContent>
+		<DialogActions>
+			<MudButton OnClick="Cancel">Cancel</MudButton>
+			<MudButton Color="Color.Primary" OnClick="Submit" Disabled=@_save>Save</MudButton>
+		</DialogActions>
+	</MudDialog>
+
+	@code {
+	public List<DataUploadVm> DataUploadVms { get; set; }
+
+	[Parameter] public ISnackbar snackbar { get; set; }
+	[Parameter] public HttpClient httpClient { get; set; }
+	[CascadingParameter]
+	private MudDialogInstance MudDialog { get; set; }
+
+	private bool _loading { get; set; } = false;
+	private bool _save { get; set; } = false;
+	private async Task Submit()
+	{
+		var json = JsonSerializer.Serialize(DataUploadVms);
+		var content = new StringContent(json, Encoding.UTF8, "application/json");
+	//	SaveUploadVm saveUploadVm = new SaveUploadVm(DataUploadVms); 
+		var response = await httpClient.PostAsync("/api/Fa/savePOUpload", content);
+
+		if (response.StatusCode == System.Net.HttpStatusCode.OK)
+		{
+			snackbar.Add("Successfully", Severity.Success);
+		}
+		else
+		{
+			snackbar.Add("Fail", Severity.Warning);
+		}
+		MudDialog.Close(DialogResult.Ok(true));
+	}
+	private void Cancel() => MudDialog.Cancel();
+	IList<IBrowserFile> files = new List<IBrowserFile>();
+	bool disabledSaveButton = false;
+
+	protected override async Task OnParametersSetAsync()
+	{
+		// _loading = true;
+		// StateHasChanged();
+		// var favms = await _faClient.GetPurchaseDetailVmAsync(PRNo);
+		// PRDetailVms = favms.Data;
+		// _loading = false;
+		// StateHasChanged();
+	}
+	private async Task UploadFiles(InputFileChangeEventArgs e)
+	{
+		using var content = new MultipartFormDataContent();
+		// Get the selected file
+		var file = e.File;
+		// Check if the file is null then return from the method
+		if (file == null)
+			return;
+		if (!IsExcelFile(file.ContentType))
+		{
+			// Handle the case when the file is not in Excel format
+			// You may want to show a message to the user or take other actions
+			snackbar.Add("Không đúng định dạng File", Severity.Warning);
+			return;
+		}
+
+		files.Add(file);
+		var fileContent = new StreamContent(file.OpenReadStream());
+		fileContent.Headers.ContentType = new MediaTypeHeaderValue(file.ContentType);
+		content.Add(content: fileContent, name: "\"files\"", fileName: file.Name);
+
+		var response = await httpClient.PostAsync("/api/Fa/uploadFile", content);
+		var attachmentObject = await response.Content.ReadFromJsonAsync<ServiceResponse<List<DataUploadVm>>>();
+		if (attachmentObject.IsSuccess == true)
+		{
+			var a = attachmentObject.Data;
+			DataUploadVms = a;
+			disabledSaveButton = false;
+
+		}
+		else
+		{
+			snackbar.Add("Error template", Severity.Warning);
+		}
+		StateHasChanged();
+	}
+	private bool IsExcelFile(string contentType)
+	{
+		// Check if the content type indicates an Excel file
+		return contentType switch
+		{
+			"application/vnd.ms-excel" => true,
+			"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" => true,
+			_ => false,
+		};
+	}
+	private string GetRowClass(DataUploadVm item, int index)
+	{
+		// index có thể được dùng nếu bạn muốn style thêm dựa trên thứ tự dòng
+		if (item.Status == true)
+		{
+			_save = true;
+		}
+		return item.Status == true ? "highlight-rowExis" : string.Empty;
+	}
+}

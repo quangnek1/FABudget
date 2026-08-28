@@ -1,0 +1,125 @@
+﻿@inject IFaClient _faClient
+
+<MudDialog Style="zoom:90%">
+	<TitleContent>
+		<MudText Typo="Typo.h6">
+			<MudIcon Icon="@Icons.Material.Filled.UploadFile" Class="mr-3" /> Purchase Request Detail By @PRNo
+		</MudText>
+	</TitleContent>
+	<DialogContent>
+		<MudTable Items="@PRDetailVms" Loading=_loading Dense=true Hover="false" Bordered="true" Striped="false" Height="500px" FixedHeader="true" RowClassFunc="GetRowClass" CustomFooter="true" >
+			<ToolBarContent>
+				<MudText Typo="Typo.h6">@PRNo</MudText>
+				</ToolBarContent>
+				<HeaderContent>
+					<MudTh>No</MudTh>
+					<MudTh>PR No</MudTh>
+					<MudTh>Name</MudTh>
+					<MudTh>Qty</MudTh>
+					<MudTh>Unit</MudTh>
+					<MudTh>NetPrice</MudTh>
+					<MudTh>Cur</MudTh>
+					<MudTh>Amount</MudTh>
+					<MudTh>DeliveryDate</MudTh>
+					<MudTh>Pur.Group</MudTh>
+					<MudTh>Item</MudTh>
+					<MudTh>Doc.Currency</MudTh>
+					<MudTh>Cur</MudTh>
+					<MudTh>QtyPO</MudTh>
+					<MudTh>Supplier</MudTh>
+				</HeaderContent>
+				<RowTemplate >
+					<MudTd>@context.RowNum</MudTd>
+					<MudTd>@context.PRNo</MudTd>
+					<MudTd>@context.Name</MudTd>
+					<MudTd>@string.Format(new System.Globalization.CultureInfo("en-US"), "{0:#,##0}", @context.Qty)</MudTd>
+					<MudTd>@context.Unit</MudTd>
+					<MudTd>@string.Format(new System.Globalization.CultureInfo("en-US"), "{0:#,##0.00}", @context.NetPrice)</MudTd>
+					<MudTd>@context.Cur</MudTd>
+					<MudTd>@string.Format(new System.Globalization.CultureInfo("en-US"), "{0:#,##0.00}", @context.Amount)</MudTd>
+					<MudTd>@Convert.ToDateTime(context.DeliveryDate).ToString("dd/MM/yyyy")</MudTd>
+					<MudTd>@context.PurchaseGroup</MudTd>
+					<MudTd>@context.Item</MudTd>
+					<MudTd>@context.DocCur</MudTd>
+					<MudTd>@context.Curr</MudTd>
+					<MudTd>@context.QtyPO</MudTd>
+					<MudTd>@context.Supplier</MudTd>
+				</RowTemplate>
+				<FooterContent>
+					<MudTFootRow Class="header-centered">
+						@if (PRDetailVms == null)
+					{
+						<MudProgressCircular Color="Color.Info" Indeterminate="true" Size="Size.Small" />
+					}
+					else if (PRDetailVms.Count() == 0)
+					{
+
+						<MudTd colspan="13" Style="text-align:center">Purchase request not found</MudTd>
+					}
+					else
+					{
+						<MudTd colspan="5"></MudTd>
+						@* <MudTd Style="font-weight:bold;">@string.Format(new System.Globalization.CultureInfo("en-US"), "{0:#,##0.00}", CalculateNetPrice())</MudTd> *@
+						<MudTd></MudTd>
+						<MudTd></MudTd>
+						<MudTd Style="font-weight:bold;">@string.Format(new System.Globalization.CultureInfo("en-US"), "{0:#,##0.00}", CalculateAmount())</MudTd>
+						<MudTd colspan="3"></MudTd>
+						<MudTd Style="font-weight:bold;">@string.Format(new System.Globalization.CultureInfo("en-US"), "{0:#,##0.00}", "$ " + CalculateDocCur())</MudTd>
+						<MudTd colspan="3"></MudTd>
+					}
+				</MudTFootRow>
+			</FooterContent>
+			<PagerContent>
+				<MudTablePager />
+			</PagerContent>
+
+		</MudTable>
+
+	</DialogContent>
+	<DialogActions>
+		@* <MudButton OnClick="Cancel">Cancel</MudButton> *@
+		<MudButton Color="Color.Primary" OnClick="Submit">Ok</MudButton>
+	</DialogActions>
+</MudDialog>
+
+
+@code {
+	public List<PRDetailVm> PRDetailVms { get; set; }
+
+	[Parameter]
+	public string PRNo { get; set; }
+
+	[CascadingParameter]
+	private MudDialogInstance MudDialog { get; set; }
+	private bool _loading { get; set; } = false;
+	private void Submit() => MudDialog.Close(DialogResult.Ok(true));
+
+	private void Cancel() => MudDialog.Cancel();
+
+	protected override async Task OnParametersSetAsync()
+	{
+		_loading = true;
+		StateHasChanged();
+		var favms = await _faClient.GetPurchaseDetailVmAsync(PRNo);
+		PRDetailVms = favms.Data;
+		_loading = false;
+		StateHasChanged();
+	}
+	private string GetRowClass(PRDetailVm item, int index)
+	{
+		// index có thể được dùng nếu bạn muốn style thêm dựa trên thứ tự dòng
+		return item.Status == 1 ? "highlight-row" : string.Empty;
+	}
+	private decimal? CalculateNetPrice()
+	{
+		return PRDetailVms.Sum(item => item.NetPrice);
+	}
+	private decimal? CalculateAmount()
+	{
+		return PRDetailVms.Sum(item => item.Amount);
+	}
+	private decimal? CalculateDocCur()
+	{
+		return PRDetailVms.Sum(item => item.DocCur);
+	}
+}

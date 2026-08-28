@@ -1,0 +1,47 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.2.32210.308
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ItemMaster.Client", "ItemMaster\Client\ItemMaster.Client.csproj", "{B9716A20-A736-4541-9251-5387D89F1CBE}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ItemMaster.Server", "ItemMaster\Server\ItemMaster.Server.csproj", "{363E0A82-91B7-407C-AD4D-5DF295F95294}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ItemMaster.Shared", "ItemMaster\Shared\ItemMaster.Shared.csproj", "{75DA03C2-1F35-4081-A3FD-546D0C225A89}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Common.Logging", "Common.Logging\Common.Logging.csproj", "{9581B136-3E5E-4540-874A-A9E50575B731}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{B9716A20-A736-4541-9251-5387D89F1CBE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B9716A20-A736-4541-9251-5387D89F1CBE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B9716A20-A736-4541-9251-5387D89F1CBE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B9716A20-A736-4541-9251-5387D89F1CBE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{363E0A82-91B7-407C-AD4D-5DF295F95294}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{363E0A82-91B7-407C-AD4D-5DF295F95294}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{363E0A82-91B7-407C-AD4D-5DF295F95294}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{363E0A82-91B7-407C-AD4D-5DF295F95294}.Release|Any CPU.Build.0 = Release|Any CPU
+		{75DA03C2-1F35-4081-A3FD-546D0C225A89}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{75DA03C2-1F35-4081-A3FD-546D0C225A89}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{75DA03C2-1F35-4081-A3FD-546D0C225A89}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{75DA03C2-1F35-4081-A3FD-546D0C225A89}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9581B136-3E5E-4540-874A-A9E50575B731}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9581B136-3E5E-4540-874A-A9E50575B731}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9581B136-3E5E-4540-874A-A9E50575B731}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9581B136-3E5E-4540-874A-A9E50575B731}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {C65D3437-CF8F-47EF-8056-A69A8EA3CDD4}
+	EndGlobalSection
+	GlobalSection(SubversionScc) = preSolution
+		Svn-Managed = True
+		Manager = AnkhSVN - Subversion Support for Visual Studio
+	EndGlobalSection
+EndGlobal

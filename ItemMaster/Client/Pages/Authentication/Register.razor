@@ -1,0 +1,128 @@
+﻿@using System.Text.RegularExpressions
+@using System.ComponentModel.DataAnnotations
+@page "/pages/authentication/register"
+@layout LoginLayout
+@inject Providers.TokenAuthenticationStateProvider TokenAuthenticationStateProvider
+@inject HttpClient HttpClient
+
+@inject NavigationManager NavigationManager
+
+@if (showErrorAlert)
+{
+    <MudAlert Severity="Severity.Error" ContentAlignment="HorizontalAlignment.Center" ShowCloseIcon="true" CloseIconClicked="(() => CloseMe(true))">
+
+        @foreach (var item in apiErrors)
+        {
+            <span>@item</span>
+        }
+    </MudAlert>
+}
+<MudForm @ref="form" @bind-IsValid="@success" @bind-Errors="@errors">
+
+    <MudText Typo="Typo.h4" GutterBottom="true">Sign Up</MudText>
+    <MudText>Already have an account? <MudLink Href="/pages/authentication/login">Sign In</MudLink></MudText>
+
+    <MudTextField T="string" @bind-Value="Email" Required="true" RequiredError="Email is required!" Label="E-mail " Validation="@(new EmailAddressAttribute() {ErrorMessage = "The email address is invalid"})" Variant=" Variant.Outlined" Class="mt-4" Fo></MudTextField>
+    <MudTextField T="string" @bind-Value="model.Code" Required="true" RequiredError="Code is required!" Label="Code " Variant=" Variant.Outlined" Class="mt-4"></MudTextField>
+    <MudTextField T="string" @bind-Value="model.FullName" Required="true" RequiredError="FullName is required!" Label="FullName " Variant=" Variant.Outlined" Class="mt-4"></MudTextField>
+
+    <MudTextField T="string" Label="Password " @bind-Value="Password" Variant="Variant.Outlined" @ref="pwField1"
+                  InputType="InputType.Password" Required="true"
+                  RequiredError="Password is required!" Class="mt-4" />
+    <MudTextField T="string"
+                  Label="Enter password again " @bind-Value="ConfirmPassword" Variant="Variant.Outlined" InputType="InputType.Password"
+                  Validation="@(new Func<string, string>(PasswordMatch))" Class="mt-4" />
+
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@(!success && !isBusy)" OnClick="() => HandleSubmit()" Size="Size.Large" FullWidth="true" Class="mt-4">Register</MudButton>
+</MudForm>
+
+
+
+
+@code {
+    string FullName { get; set; }
+    string Code { get; set; }
+    bool success = default;
+    bool isBusy = default;
+    string Password { get; set; }
+    string Email { get; set; }
+    string ConfirmPassword { get; set; }
+    public bool AgreeToTerms { get; set; }
+
+    private bool showCallAlert = false;
+    private bool showErrorAlert = false;
+
+    private RegisterModel model = new RegisterModel();
+
+    string[] errors = { };
+    MudForm form;
+
+    bool PasswordVisibility;
+    InputType PasswordInput = InputType.Password;
+    string PasswordInputIcon = Icons.Material.Filled.VisibilityOff;
+    MudTextField<string> pwField1;
+
+    List<string> apiErrors = new List<string> { };
+
+    void TogglePasswordVisibility()
+    {
+        @if (PasswordVisibility)
+        {
+            PasswordVisibility = false;
+            PasswordInputIcon = Icons.Material.Filled.VisibilityOff;
+            PasswordInput = InputType.Password;
+        }
+        else
+        {
+            PasswordVisibility = true;
+            PasswordInputIcon = Icons.Material.Filled.Visibility;
+            PasswordInput = InputType.Text;
+        }
+    }
+
+    private string PasswordMatch(string arg)
+    {
+        if (pwField1.Value != arg)
+            return "Passwords don't match";
+        return null;
+    }
+    private void CloseMe(bool value)
+    {
+        if (value)
+        {
+            showErrorAlert = false;
+        }
+        else
+        {
+            showCallAlert = false;
+        }
+    }
+    async Task HandleSubmit()
+    {
+        isBusy = false;
+        success = false;
+
+        model = new RegisterModel
+            {
+                Email = Email,
+                Password = Password,
+                ConfirmPassword = ConfirmPassword
+            };
+
+        var response = await HttpClient.PostAsJsonAsync("api/account/register/", model);
+        var registerResult = await response.Content.ReadFromJsonAsync<RegisterResult>();
+
+        if (registerResult.Successful)
+        {
+            NavigationManager.NavigateTo("pages/authentication/login");
+        }
+        else
+        {
+            showErrorAlert = true;
+            foreach (var item in registerResult.Errors)
+            {
+                apiErrors.Add(item);
+            }
+        }
+    }
+}

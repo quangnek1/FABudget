@@ -1,0 +1,190 @@
+﻿@page "/pages/authentication/login"
+
+@layout LoginLayout
+@inject IAuthService AuthService
+@inject Providers.TokenAuthenticationStateProvider TokenAuthenticationStateProvider
+@inject HttpClient HttpClient
+@inject NavigationManager NavigationManager
+
+
+<MudForm @ref="form" @bind-IsValid="@success" @bind-Errors="@errors" @onkeydown="@EnterKey">
+	<MudText Typo="Typo.h4" GutterBottom="true" Class="mt-4">Sign In - 50期　設備計画</MudText>
+
+	<MudText Typo="Typo.caption">Using Improvement Proposal Account </MudText>
+
+	<MudTextField T="string" @bind-Value="@Code" Required="true" Label="Code ID " Variant="Variant.Outlined" Class="my-6"></MudTextField>
+
+	<MudTextField @bind-Value="@Password" Label="Password " Required="true" Variant="Variant.Outlined" InputType="@PasswordInput" Adornment="Adornment.End" AdornmentIcon="@PasswordInputIcon" OnAdornmentClick="TogglePasswordVisibility" />
+
+	<div Class="d-flex justify-space-between align-center">
+		<MudCheckBox T="bool" Label="Remember me?" @bind-Checked="RememberMe" Color="Color.Primary" Class="ml-n1 my-3"></MudCheckBox>
+		<MudSpacer />
+		<br />
+		<br />
+		<MudLink Href="/pages/authentication/forgot-password">Forgot pwd?</MudLink>
+	</div>
+
+
+	<MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@(!success && !isBusy)" Size="Size.Large" FullWidth="true" OnClick="() => HandleSubmit()">Sign In</MudButton>
+
+
+</MudForm>
+
+
+@code {
+	private bool showCallAlert = false;
+	private bool showErrorAlert = false;
+	private bool isGuest = default;
+
+	string Password { get; set; } = default;
+	string Code { get; set; }
+	string Email { get; set; }
+	bool RememberMe { get; set; } = default;
+	bool isBusy = default;
+
+	LoginModel model = new LoginModel();
+	bool success { get; set; } = false;
+	string[] errors = { };
+
+	// MudTextField<string> pwField1;
+	MudForm form;
+
+	string _returnURL = "";
+
+	protected override void OnInitialized()
+	{
+		 
+
+		var uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri); //you can use IURIHelper for older versions
+
+		if (QueryHelpers.ParseQuery(uri.Query).TryGetValue("returnUrl", out var url))
+		{
+			_returnURL = url.First();
+		}
+
+	}
+
+	public class RegisterAccountForm
+	{
+		[Required]
+		[StringLength(8, ErrorMessage = "Name length can't be more than 8.")]
+		public string Username { get; set; }
+
+		[Required]
+		[EmailAddress]
+		public string Email { get; set; }
+
+		[Required]
+		[StringLength(30, ErrorMessage = "Password must be at least 8 characters long.", MinimumLength = 8)]
+		public string Password { get; set; }
+
+		[Required]
+		[Compare(nameof(Password))]
+		public string Password2 { get; set; }
+	}
+
+	private async Task HandleGuest()
+	{
+		isBusy = false;
+		success = false;
+		isGuest = true;
+
+		model = new LoginModel
+			{
+				Code = "6156",
+				//   Email = "cisse@yahoo.com",
+				Password = "11111",
+				RememberMe = true
+			};
+		await DangNhap(model);
+	}
+	private async Task HandleSubmit()
+	{
+		model = new LoginModel
+			{
+				Code = Code,
+				Password = Password,
+				RememberMe = RememberMe
+			};
+		await DangNhap(model);
+	}
+	private async Task EnterKey(KeyboardEventArgs e)
+	{
+		if (e.Code == "Enter" || e.Code == "NumpadEnter")
+		{
+			model = new LoginModel
+				{
+					Code = Code,
+					Password = Password,
+					RememberMe = RememberMe
+				};
+			await DangNhap(model);
+		}
+	}
+	private async Task OnValidSubmit(EditContext context)
+	{
+		//success = true;
+		//StateHasChanged();
+
+		var response = await HttpClient.PostAsJsonAsync("api/account/login", model);
+		var loginResult = await response.Content.ReadFromJsonAsync<LoginResult>();
+		if (loginResult.Successful)
+		{
+			await TokenAuthenticationStateProvider.Login(loginResult.Token);
+			NavigationManager.NavigateTo(_returnURL);
+		}
+		else
+		{
+			showErrorAlert = true;
+		}
+
+	}
+	bool PasswordVisibility;
+	InputType PasswordInput = InputType.Password;
+	string PasswordInputIcon = Icons.Material.Filled.VisibilityOff;
+
+	void TogglePasswordVisibility()
+	{
+		@if (PasswordVisibility)
+		{
+			PasswordVisibility = false;
+			PasswordInputIcon = Icons.Material.Filled.VisibilityOff;
+			PasswordInput = InputType.Password;
+		}
+		else
+		{
+			PasswordVisibility = true;
+			PasswordInputIcon = Icons.Material.Filled.Visibility;
+			PasswordInput = InputType.Text;
+		}
+	}
+
+	private void CloseMe(bool value)
+	{
+		if (value)
+		{
+			showErrorAlert = false;
+		}
+		else
+		{
+			showCallAlert = false;
+		}
+	}
+	private async Task DangNhap(LoginModel model)
+	{
+		isBusy = false;
+		success = false;
+
+		var result = await AuthService.LoginAsync(model);
+		if (result.IsSuccess)
+		{
+			await TokenAuthenticationStateProvider.Login(result.Data);
+			NavigationManager.NavigateTo(_returnURL);
+		}
+		else
+		{
+			showErrorAlert = true;
+			Console.WriteLine("Invalid username or password");
+		}
+	}
+}

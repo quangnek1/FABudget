@@ -1,0 +1,1664 @@
+﻿@page "/"
+@inject HttpClient httpClient
+@using ItemMaster.Client.Shared.Dialog
+@inject NavigationManager NavigationManager
+@inject IFaClient _faClient
+@inject ISnackbar snackbar
+@inject IJSRuntime JS
+@inject AuthenticationStateProvider AuthStateProvider
+
+@inject IDialogService DialogService
+
+<PageTitle>51期　設備計画</PageTitle>
+<style type="text/css">
+	.mud-table-head .header-centered th {
+		text-align: center;
+		/* font-size: 1.2em; */
+	}
+
+
+	.custom-flex {
+		display: flex;
+		align-items: center; /* Căn giữa các phần tử theo chiều dọc */
+	}
+
+		.custom-flex .mud-icon-button {
+			margin: 0; /* Loại bỏ khoảng cách bên ngoài cho nút */
+		}
+
+		.custom-flex .mud-text-field {
+			width: 50px;
+			margin: 0; /* Loại bỏ khoảng cách bên ngoài cho ô nhập liệu */
+			text-align: center; /* Căn giữa nội dung trong ô nhập liệu */
+		}
+
+	#tableMain .mud-table-container .mud-table-body {
+		zoom: @_zoomContent %;
+	}
+
+	#tableMain .mud-table-container .mud-table-root {
+		width: max-content;
+	}
+
+	.zoomable-table {
+		--zoom-factor: @_zoom; /* Gán giá trị zoomFactor vào biến CSS */
+	}
+
+	.sticky-left {
+		position: sticky; /* Đặt vị trí sticky cho cột */
+		left: 0; /* Đặt vị trí bên trái */
+		z-index: 2; /* Đảm bảo cột luôn ở trên cùng */
+		/* background-color: white; */ /* Màu nền trắng để không bị che khuất */
+		background-color: var(--mud-palette-background);
+	}
+	/* Hiệu ứng striped cho ô sticky */
+	tbody tr:nth-child(odd) .sticky-left {
+		background-color: #fafafa; /* Màu nền cho hàng lẻ */
+	}
+
+	tbody tr:nth-child(even) .sticky-left {
+		background-color: white; /* Màu nền cho hàng chẵn */
+	}
+</style>
+
+
+
+
+<MudGrid>
+	<MudItem xs="12">
+		<MudTable id="tableMain" Class="zoomable-content " Virtualize="false" FixedHeader=true HeaderClass="table-head-bordered" CustomHeader="true" CustomFooter="true" Items="@fABudgetVms" Dense="@dense" Hover="@hover" Bordered="@bordered" Striped="@striped" Filter="new Func<FABudgetVm,bool>(FilterFunc1)" @bind-SelectedItem="fABudgetVm" Height="@styleRow" Loading="@_loading" LoadingProgressColor="Color.Info" HorizontalScrollbar="true" OnRowClick="OnRowClickCallback" RowsPerPageChanged="OnRowsPerPageChanged">
+			<ToolBarContent>
+				<MudTooltip Text="Upload Data" Color="Color.Info" Placement="Placement.Top">
+					<div>
+						<MudIconButton Icon="@Icons.Material.Rounded.FileUpload" Color="Color.Info" Size="Size.Small" OnClick="@(() => OpenDialogUploadDataAsync())"></MudIconButton>
+					</div>
+				</MudTooltip>
+				@if (_loadingDownload == true)
+				{
+					<MudProgressCircular Color="Color.Info" Indeterminate="true" Size="Size.Small" />
+				}
+				else
+				{
+					<MudTooltip Text="Download" Color="Color.Warning" Placement="Placement.Top">
+						<div>
+							<MudIconButton Icon="@Icons.Material.Rounded.Download" Color="Color.Warning" Size="Size.Small" OnClick="@(() => ExportDataPO())"></MudIconButton>
+						</div>
+					</MudTooltip>
+				}
+
+				<MudText Typo="Typo.h6">FA Budget List</MudText>
+				<MudIconButton Icon="@Icons.Material.Filled.Add" Size="Size.Small" OnClick="@(() => OpenDialog())"></MudIconButton>
+				<MudSpacer />
+				<MudTextField @bind-Value="searchString1" Placeholder="Search: No / 資産名 /担当者" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
+				<MudItem xs="1" Class="d-flex align-items-center" Style="gap: 0; width:50%">
+
+					<MudIconButton Icon="@Icons.Material.Filled.ZoomOut" Size="Size.Small" OnClick="@(() => Zoom(0))"></MudIconButton>
+
+					<MudTextField @bind-Value="_zoomContent" AdornmentText="%" Adornment="Adornment.End"
+								  Style=" margin: 0; text-align: center;"
+								  Variant="Variant.Text" />
+
+					<MudIconButton Icon="@Icons.Material.Filled.ZoomIn" Size="Size.Small" OnClick="@(() => Zoom(1))"></MudIconButton>
+
+					@if (_loadingDownload == true)
+					{
+						<MudProgressCircular Color="Color.Info" Indeterminate="true" Size="Size.Small" />
+					}
+					else
+					{
+						<MudIconButton Icon="@Icons.Material.Rounded.Download" Size="Size.Small" OnClick="@(() => ExportData())" Color="Color.Primary">Export</MudIconButton>
+					}
+
+				</MudItem>
+
+
+			</ToolBarContent>
+			<HeaderContent>
+				<MudTHeadRow Class="header-centered">
+					<MudTh colspan="6" Style="z-index: 3;border-right: none;" Class="sticky-left"></MudTh>
+					<MudTh colspan="3"></MudTh>
+					<MudTh colspan="2">Budget/予算</MudTh>
+					<MudTh colspan="2">Estimation/予測</MudTh>
+					<MudTh colspan="4">Budget/予算</MudTh>
+					<MudTh></MudTh>
+					<MudTh colspan="3">USD</MudTh>
+
+					<MudTh colspan="3">Estimation/予測（USD）</MudTh>
+					<MudTh colspan="5"></MudTh>
+
+				</MudTHeadRow>
+				<MudTHeadRow Class="header-centered">
+					<MudTh Style="z-index: 3" Class="sticky-left">№</MudTh>
+					<MudTh Style=" z-index: 3; left: 82px; ">科目ｺｰﾄﾞ</MudTh>
+					<MudTh Style=" z-index: 3; left: 236px;">科目</MudTh>
+					<MudTh Style=" z-index: 3; left: 388px;">優先ﾗﾝｸ</MudTh>
+					<MudTh Style=" z-index: 3; left: 537px;">資産名</MudTh>
+					@* <MudTh Style=" z-index: 3; left: 892px;">担当者</MudTh> *@
+					<MudTh>担当者</MudTh>
+					<MudTh>部門ｺｰﾄﾞ	</MudTh>
+					<MudTh>ｾｸﾞﾒﾝﾄ</MudTh>
+					<MudTh>部門名</MudTh>
+					<MudTh>予算購入時期</MudTh>
+					<MudTh>予算減価償却開始時期</MudTh>
+					<MudTh>予測購入時期</MudTh>
+					<MudTh>
+						減価償却
+						開始時期
+					</MudTh>
+					<MudTh>
+						通貨
+					</MudTh>
+					<MudTh>
+						当期
+						投資額
+					</MudTh>
+					<MudTh>
+						前期投資額
+						／部署移動
+					</MudTh>
+					<MudTh>
+						固定資産
+						計上額
+					</MudTh>
+					<MudTh>
+						レート
+					</MudTh>
+					<MudTh>
+						当期
+						投資額
+					</MudTh>
+					<MudTh>
+						前期投資額
+						／部署移動
+					</MudTh>
+					<MudTh>
+						固定資産
+						計上額
+					</MudTh>
+					<MudTh>
+						当期
+						投資額
+					</MudTh>
+					<MudTh>
+						前期投資額
+						／部署移動
+					</MudTh>
+					<MudTh>
+						固定資産
+						計上額
+					</MudTh>
+					<MudTh>
+						稟議No
+					</MudTh>
+					<MudTh>
+						充当No
+					</MudTh>
+					<MudTh>
+						予算残金額
+					</MudTh>
+					<MudTh>
+						備考
+					</MudTh>
+					@* 	<MudTh>
+					スポット有無
+					</MudTh> *@
+					<MudTh></MudTh>
+				</MudTHeadRow>
+				<MudTHeadRow Class="header-centered">
+					<MudTh Style="z-index: 3" Class="sticky-left"><MudTableSortLabel SortBy="new Func<FABudgetVm, object>(x=>x.No)">№</MudTableSortLabel></MudTh>
+					<MudTh Style=" z-index: 3; left: 82px; "><MudTableSortLabel SortBy="new Func<FABudgetVm, object>(x=>x.GLACCOUNT)"> GL ACCOUNT</MudTableSortLabel></MudTh>
+					<MudTh Style=" z-index: 3; left: 236px;"><MudTableSortLabel SortBy="new Func<FABudgetVm, object>(x=>x.AccountText)"> Account Text</MudTableSortLabel></MudTh>
+					<MudTh Style=" z-index: 3; left: 388px;"><MudTableSortLabel SortBy="new Func<FABudgetVm, object>(x=>x.PriorityRank)">Priority Rank</MudTableSortLabel></MudTh>
+					<MudTh Style=" z-index: 3; left: 537px;"><MudTableSortLabel SortBy="new Func<FABudgetVm, object>(x=>x.AssetName)"> Asset Name</MudTableSortLabel></MudTh>
+					<MudTh><MudTableSortLabel SortBy="new Func<FABudgetVm, object>(x=>x.PersonInCharge)"> Person in charge</MudTableSortLabel></MudTh>
+					<MudTh><MudTableSortLabel SortBy="new Func<FABudgetVm, object>(x=>x.SectionCode)"> Section Code</MudTableSortLabel></MudTh>
+					<MudTh><MudTableSortLabel SortBy="new Func<FABudgetVm, object>(x=>x.Segment)"> Segment</MudTableSortLabel></MudTh>
+					<MudTh><MudTableSortLabel SortBy="new Func<FABudgetVm, object>(x=>x.SectionName)">Section Name</MudTableSortLabel></MudTh>
+					<MudTh><MudTableSortLabel SortBy="new Func<FABudgetVm, object>(x=>x.PurchaseTimeBudget)">Purchase time</MudTableSortLabel></MudTh>
+					<MudTh><MudTableSortLabel SortBy="new Func<FABudgetVm, object>(x=>x.DepreciationStartTimeBudget)">Depreciation start time</MudTableSortLabel></MudTh>
+					<MudTh><MudTableSortLabel SortBy="new Func<FABudgetVm, object>(x=>x.PurchaseTimeEstimation)">Purchase time</MudTableSortLabel></MudTh>
+					<MudTh><MudTableSortLabel SortBy="new Func<FABudgetVm, object>(x=>x.DepreciationStartTimeEstimation)">Depreciation start time</MudTableSortLabel></MudTh>
+					<MudTh><MudTableSortLabel SortBy="new Func<FABudgetVm, object>(x=>x.Currency)">Currency</MudTableSortLabel></MudTh>
+					<MudTh><MudTableSortLabel SortBy="new Func<FABudgetVm, object>(x=>x.CurrentInvestmentAmountBudget)">Current investment amount</MudTableSortLabel></MudTh>
+					<MudTh><MudTableSortLabel SortBy="new Func<FABudgetVm, object>(x=>x.PreviousInvestmentAmountBudget)">Previous investment amount</MudTableSortLabel></MudTh>
+					<MudTh><MudTableSortLabel SortBy="new Func<FABudgetVm, object>(x=>x.FixedAssetsAccountedAmountBudget)">Fixed assets Accounted amount</MudTableSortLabel></MudTh>
+					<MudTh><MudTableSortLabel SortBy="new Func<FABudgetVm, object>(x=>x.EXRate)">EX Rate</MudTableSortLabel></MudTh>
+					<MudTh><MudTableSortLabel SortBy="new Func<FABudgetVm, object>(x=>x.CurrentInvestmentAmountUSD)">Current investment amount</MudTableSortLabel></MudTh>
+					<MudTh><MudTableSortLabel SortBy="new Func<FABudgetVm, object>(x=>x.PreviousInvestmentAmountUSD)">Previous investment amount</MudTableSortLabel></MudTh>
+					<MudTh>
+						<MudTableSortLabel SortBy="new Func<FABudgetVm, object>(x=>x.FixedAssetsAccountedAmountUSD)">
+							Fixed assets
+							Accounted amount
+						</MudTableSortLabel>
+
+					</MudTh>
+					<MudTh><MudTableSortLabel SortBy="new Func<FABudgetVm, object>(x=>x.CurrentInvestmentAmountEstimationUSD)">Current investment amount</MudTableSortLabel></MudTh>
+					<MudTh><MudTableSortLabel SortBy="new Func<FABudgetVm, object>(x=>x.PreviousInvestmentAmountEstimationUSD)">Previous investment amount</MudTableSortLabel></MudTh>
+					<MudTh>
+						<MudTableSortLabel SortBy="new Func<FABudgetVm, object>(x=>x.FixedAssetsAccountedAmountEstimationUSD)">	Fixed assets Accounted amount</MudTableSortLabel>
+
+					</MudTh>
+					<MudTh><MudTableSortLabel SortBy="new Func<FABudgetVm, object>(x=>x.RingishoNo)">Ringisho No</MudTableSortLabel></MudTh>
+					<MudTh><MudTableSortLabel SortBy="new Func<FABudgetVm, object>(x=>x.AppropriatedBudgetNo)">Appropriated Budget No</MudTableSortLabel></MudTh>
+					<MudTh><MudTableSortLabel SortBy="new Func<FABudgetVm, object>(x=>x.BudgetRemaining)">FABudget Remaining</MudTableSortLabel></MudTh>
+					<MudTh>Remark</MudTh>
+					<MudTh></MudTh>
+				</MudTHeadRow>
+			</HeaderContent>
+			<RowTemplate>
+				<MudTd DataLabel="Id" Class="sticky-left">@context.No</MudTd>
+				<MudTd DataLabel="Sign" Style="  left: 82px; " Class="sticky-left">@context.GLACCOUNT</MudTd>
+				<MudTd DataLabel="Name" Style="  left: 236px;" Class="sticky-left">@context.AccountText</MudTd>
+				<MudTd DataLabel="Name" Style="  left: 388px;" Class="sticky-left">@context.PriorityRank</MudTd>
+				<MudTd DataLabel="Name" Style="  left: 537px;" Class="sticky-left">@context.AssetName</MudTd>
+				@* <MudTd DataLabel="Name" Style="  left: 892px;" Class="sticky-left">@context.PersonInCharge</MudTd> *@
+				<MudTd DataLabel="Name">@context.PersonInCharge</MudTd>
+				<MudTd DataLabel="Name">@context.SectionCode</MudTd>
+				<MudTd DataLabel="Name">@context.Segment</MudTd>
+				<MudTd DataLabel="Name">@context.SectionName</MudTd>
+				<MudTd DataLabel="Name">@Convert.ToDateTime(context.PurchaseTimeBudget).ToString("MM/yy")</MudTd>
+				<MudTd DataLabel="Name">@Convert.ToDateTime(context.DepreciationStartTimeBudget).ToString("MM/yy")</MudTd>
+				<MudTd DataLabel="Name">@Convert.ToDateTime(context.PurchaseTimeEstimation).ToString("MM/yy")</MudTd>
+				<MudTd DataLabel="Name">@Convert.ToDateTime(context.DepreciationStartTimeEstimation).ToString("MM/yy")</MudTd>
+				<MudTd DataLabel="Name">@context.Currency</MudTd>
+				<MudTd DataLabel="Name">@string.Format(new System.Globalization.CultureInfo("en-US"), "{0:#,##0.00}", @context.CurrentInvestmentAmountBudget)</MudTd>
+				<MudTd DataLabel="Name">@string.Format(new System.Globalization.CultureInfo("en-US"), "{0:#,##0.00}", @context.PreviousInvestmentAmountBudget)</MudTd>
+				<MudTd DataLabel="Name">@string.Format(new System.Globalization.CultureInfo("en-US"), "{0:#,##0.00}", @context.FixedAssetsAccountedAmountBudget)</MudTd>
+				<MudTd DataLabel="Name">@string.Format(new System.Globalization.CultureInfo("en-US"), "{0:#,##0.00}", @context.EXRate)</MudTd>
+				<MudTd DataLabel="Name">@string.Format(new System.Globalization.CultureInfo("en-US"), "{0:#,##0.00}", @context.CurrentInvestmentAmountUSD)</MudTd>
+				<MudTd DataLabel="Name">@string.Format(new System.Globalization.CultureInfo("en-US"), "{0:#,##0.00}", @context.PreviousInvestmentAmountUSD)</MudTd>
+				<MudTd DataLabel="Name">@string.Format(new System.Globalization.CultureInfo("en-US"), "{0:#,##0.00}", @context.FixedAssetsAccountedAmountUSD)</MudTd>
+				<MudTd DataLabel="Name">@string.Format(new System.Globalization.CultureInfo("en-US"), "{0:#,##0.00}", @context.CurrentInvestmentAmountEstimationUSD)</MudTd>
+				<MudTd DataLabel="Name">@string.Format(new System.Globalization.CultureInfo("en-US"), "{0:#,##0.00}", @context.PreviousInvestmentAmountEstimationUSD)</MudTd>
+				<MudTd DataLabel="Name">@string.Format(new System.Globalization.CultureInfo("en-US"), "{0:#,##0.00}", @context.FixedAssetsAccountedAmountEstimationUSD)</MudTd>
+				<MudTd DataLabel="Name">
+					<MudTooltip Text="Purchase Request Detail" Color="Color.Info" Placement="Placement.Top">
+						<div @onclick:stopPropagation>
+
+							<MudLink Class="cursor-pointer" @onclick="() => OpenDialogAsync(context.RingishoNo)" Color="Color.Primary">
+								@context.RingishoNo
+							</MudLink>
+						</div>
+					</MudTooltip>
+				</MudTd>
+				<MudTd DataLabel="Name">@context.AppropriatedBudgetNo</MudTd>
+				<MudTd DataLabel="Name">@context.BudgetRemaining</MudTd>
+				<MudTd DataLabel="Name">@context.Remark</MudTd>
+				@* 		<MudTd DataLabel="Name">@context.DepreciationPeriod</MudTd> *@
+				<MudTd DataLabel="Name">
+
+					<MudTooltip Text="Edit/Update" Color="Color.Info" Placement="Placement.Top">
+						<MudIconButton Icon="@Icons.Material.TwoTone.Edit" Size="Size.Small" OnClick="@(() => Edit(context.Id, @context.AssetName))" aria-label="Show"></MudIconButton>
+					</MudTooltip>
+				</MudTd>
+
+			</RowTemplate>
+			<FooterContent>
+				<MudTFootRow Class="header-centered">
+					@if (fABudgetObjectVm == null)
+					{
+						<MudProgressCircular Color="Color.Info" Indeterminate="true" Size="Size.Small" />
+					}
+					else
+					{
+						<MudTd colspan="6" Style="z-index: 3;border-right: none;" Class="sticky-left"></MudTd>
+						<MudTd colspan="8"></MudTd>
+						<MudTd>当期 投資額:@string.Format(new System.Globalization.CultureInfo("en-US"), "{0:#,##0.00}", @fABudgetObjectVm.FABudgetSumaryVm.CurrentInvestmentAmountBudget)</MudTd>
+						<MudTd>前期投資額／部署移動: @string.Format(new System.Globalization.CultureInfo("en-US"), "{0:#,##0.00}", @fABudgetObjectVm.FABudgetSumaryVm.PreviousInvestmentAmountBudget)</MudTd>
+						<MudTd>固定資産 計上額: @string.Format(new System.Globalization.CultureInfo("en-US"), "{0:#,##0.00}", @fABudgetObjectVm.FABudgetSumaryVm.FixedAssetsAccountedAmountBudget)</MudTd>
+						<MudTd></MudTd>
+						<MudTd>当期投資額: @string.Format(new System.Globalization.CultureInfo("en-US"), "{0:#,##0.00}", @fABudgetObjectVm.FABudgetSumaryVm.CurrentInvestmentAmountUSD)</MudTd>
+						<MudTd>前期投資額／部署移動: @string.Format(new System.Globalization.CultureInfo("en-US"), "{0:#,##0.00}", @fABudgetObjectVm.FABudgetSumaryVm.PreviousInvestmentAmountUSD)</MudTd>
+						<MudTd>固定資産計上額: @string.Format(new System.Globalization.CultureInfo("en-US"), "{0:#,##0.00}", @fABudgetObjectVm.FABudgetSumaryVm.FixedAssetsAccountedAmountUSD)</MudTd>
+						<MudTd>当期投資額: @string.Format(new System.Globalization.CultureInfo("en-US"), "{0:#,##0.00}", @fABudgetObjectVm.FABudgetSumaryVm.CurrentInvestmentAmountEstimationUSD)</MudTd>
+						<MudTd>前期投資額／部署移動: @string.Format(new System.Globalization.CultureInfo("en-US"), "{0:#,##0.00}", @fABudgetObjectVm.FABudgetSumaryVm.PreviousInvestmentAmountEstimationUSD)</MudTd>
+						<MudTd>固定資産計上額: @string.Format(new System.Globalization.CultureInfo("en-US"), "{0:#,##0.00}", @fABudgetObjectVm.FABudgetSumaryVm.FixedAssetsAccountedAmountEstimationUSD)</MudTd>
+						<MudTd colspan="5"></MudTd>
+					}
+				</MudTFootRow>
+			</FooterContent>
+			<PagerContent>
+				<MudTablePager />
+			</PagerContent>
+		</MudTable>
+	</MudItem>
+	<MudItem xs="4">
+		<MudTable Items="@dataVm.SectionVms" Dense="@dense" Hover="@hover" Bordered="@bordered" Striped="@striped" Class="zoomable-content">
+			<ToolBarContent>
+				<MudText Typo="Typo.h6">配賦 AIH</MudText>
+				<MudSpacer />
+				@* <MudTextField @bind-Value="searchString1" Placeholder="Search" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField> *@
+			</ToolBarContent>
+			<HeaderContent>
+				<MudTh>部門ｺｰﾄﾞ</MudTh>
+				<MudTh>ｾｸﾞﾒﾝﾄ</MudTh>
+				<MudTh>部門名</MudTh>
+			</HeaderContent>
+			<RowTemplate>
+				<MudTd DataLabel="Nr">@context.SectionCode</MudTd>
+				<MudTd DataLabel="Sign">@context.Segment</MudTd>
+				<MudTd DataLabel="Name">@context.SectionName</MudTd>
+			</RowTemplate>
+			<PagerContent>
+				<MudTablePager />
+			</PagerContent>
+		</MudTable>
+	</MudItem>
+	<MudItem xs="4">
+		<MudTable Items="@dataVm.AccountVms" Dense="@dense" Hover="@hover" Bordered="@bordered" Striped="@striped" Class="zoomable-content">
+			<ToolBarContent>
+				<MudText Typo="Typo.h6">科目 - 科目ｺｰﾄﾞ</MudText>
+				<MudSpacer />
+				@* <MudTextField @bind-Value="searchString1" Placeholder="Search" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField> *@
+			</ToolBarContent>
+			<HeaderContent>
+				<MudTh>科目</MudTh>
+				<MudTh>科目ｺｰﾄﾞ</MudTh>
+			</HeaderContent>
+			<RowTemplate>
+				<MudTd>@context.AccountText</MudTd>
+				<MudTd>@(context.GLACCOUNT == 0 ? "N/A" : context.GLACCOUNT)</MudTd>
+			</RowTemplate>
+			<PagerContent>
+				<MudTablePager />
+			</PagerContent>
+		</MudTable>
+	</MudItem>
+	<MudItem xs="4">
+		<MudTable Items="@dataVm.RateVms" Dense="@dense" Hover="@hover" Bordered="@bordered" Striped="@striped" Class="zoomable-content">
+			<ToolBarContent>
+				<MudText Typo="Typo.h6">レート</MudText>
+				<MudSpacer />
+				@* <MudTextField @bind-Value="searchString1" Placeholder="Search" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField> *@
+			</ToolBarContent>
+			<HeaderContent>
+				<MudTh>通貨</MudTh>
+				<MudTh>当期</MudTh>
+				<MudTh>来期以降</MudTh>
+			</HeaderContent>
+			<RowTemplate>
+				<MudTd>@context.Currency</MudTd>
+				<MudTd>@context.Current</MudTd>
+				<MudTd>@context.NextYear</MudTd>
+			</RowTemplate>
+			<PagerContent>
+				<MudTablePager />
+			</PagerContent>
+		</MudTable>
+	</MudItem>
+	<MudItem xs="12">
+		<FABudgetHistory budgetHistoryList="dataVm.FAbudgetHistoryListVms"></FABudgetHistory>
+	</MudItem>
+</MudGrid>
+
+
+<MudDialog @bind-IsVisible="visible" Options="dialogOptions" Style="zoom:90%">
+	<TitleContent>
+		<MudText Typo="Typo.h6">
+			<MudIcon Icon="@Icons.Material.Filled.UploadFile" Class="mr-3" /> Add Asset
+		</MudText>
+	</TitleContent>
+	<DialogContent>
+		<MudGrid Style="display:none;">
+			<MudItem xs="6">
+				<InputFile id="fileInput" OnChange="UploadFiles" hidden multiple />
+				<MudButton HtmlTag="label"
+						   Color="Color.Info"
+						   Variant="Variant.Filled"
+						   StartIcon="@Icons.Material.Filled.CloudUpload"
+						   for="fileInput">
+					Upload File
+				</MudButton>
+			</MudItem>
+			<MudItem xs="6">
+				@if (files != null)
+				{
+					@* 	<MudText Typo="@Typo.h6">@files.Count() File@(files.Count() == 1 ? "" : "s"):</MudText> *@
+					<MudList>
+						@foreach (var file in files)
+						{
+							<MudListItem Icon="@Icons.Material.Filled.AttachFile" @key="@file">
+								@file.Name <code>@file.Size bytes</code>
+							</MudListItem>
+						}
+					</MudList>
+				}
+			</MudItem>
+		</MudGrid>
+		<MudForm Model="@fABudgetRequestVm" @ref="form">
+			<MudSimpleTable Hover="true" Dense="true">
+				<thead>
+					<tr>
+						<th>№</th>
+						<th>GL Account</th>
+						<th>Account Text</th>
+						<th>Priority Rank</th>
+						<th>Asset Name</th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr>
+						<td><MudText>@fABudgetRequestVm.No</MudText></td>
+						<td>
+							<MudTextField @bind-Value="@fABudgetRequestVm.GLACCOUNT" For="@(() => fABudgetRequestVm.GLACCOUNT)" Label="科目ｺｰﾄﾞ" Variant="Variant.Filled" Disabled="true"></MudTextField>
+						</td>
+						<td>
+							<MudSelect Value="fABudgetRequestVm.AccountText" For="@(() => fABudgetRequestVm.AccountText)" T="string" Label="科目" AnchorOrigin="Origin.BottomCenter" Disabled="false" Variant="Variant.Text" Dense="true" ValueChanged="AddOnAccountTextChanged">
+								@foreach (var item in dataVm.AccountVms)
+								{
+									<MudSelectItem T="string" Value="@item.AccountText">@item.AccountText</MudSelectItem>
+								}
+							</MudSelect>
+						</td>
+						<td>
+							<MudSelect @bind-Value="fABudgetRequestVm.PriorityRank" For="@(() => fABudgetRequestVm.PriorityRank)" T="int?" Label="優先ﾗﾝｸ" AnchorOrigin="Origin.BottomCenter" Disabled="false" Variant="Variant.Text" Dense="true">
+								@foreach (var item in dataVm.PriorityVm)
+								{
+									<MudSelectItem T="int?" Value="@item">@item</MudSelectItem>
+								}
+							</MudSelect>
+						</td>
+						<td><MudTextField @bind-Value="@fABudgetRequestVm.AssetName" For="@(() => fABudgetRequestVm.AssetName)" Label="資産名" Variant="Variant.Text"></MudTextField></td>
+					</tr>
+					<tr>
+						<th>Person In Charge</th>
+						<th>Section Code</th>
+						<th>Segment</th>
+						<th>Section Name</th>
+						<th>Currency</th>
+
+					</tr>
+					<tr>
+						<td>
+							@* <MudTextField @bind-Value="@fABudgetRequestVm.PersonInCharge" For="@(() => fABudgetRequestVm.PersonInCharge)" Label="担当者" Variant="Variant.Text"></MudTextField> *@
+							<MudSelect @bind-Value="fABudgetRequestVm.PersonInCharge" For="@(() => fABudgetRequestVm.PersonInCharge)" T="string" Label="担当者" AnchorOrigin="Origin.BottomCenter" Disabled="false" Variant="Variant.Text" Dense="true">
+								@foreach (var item in dataVm.GroupEmailSendsVms)
+								{
+									<MudSelectItem T="string" Value="@item.Content">@item.Content</MudSelectItem>
+								}
+							</MudSelect>
+						</td>
+						<td>
+							<MudSelect Value="fABudgetRequestVm.SectionCode" For="@(() => fABudgetRequestVm.SectionCode)" T="string" Label="部門ｺｰﾄ" AnchorOrigin="Origin.BottomCenter" Disabled="false" Variant="Variant.Text" Dense="true" ValueChanged="AddSectionTextChanged">
+								@foreach (var item in dataVm.SectionVms)
+								{
+									<MudSelectItem T="string" Value="@item.SectionCode">@item.SectionCode - @item.Segment - @item.SectionName</MudSelectItem>
+								}
+							</MudSelect>
+
+						</td>
+						<td>
+							<MudTextField @bind-Value="@fABudgetRequestVm.Segment" For="@(() => fABudgetRequestVm.Segment)" Label="ｾｸﾞﾒﾝﾄ" Variant="Variant.Filled" Disabled="true"></MudTextField>
+						</td>
+						<td>
+							<MudTextField @bind-Value="@fABudgetRequestVm.SectionName" For="@(() => fABudgetRequestVm.SectionName)" Label="部門名" Variant="Variant.Filled" Disabled="true"></MudTextField>
+						</td>
+						<td>
+							<MudSelect Value="fABudgetRequestVm.Currency" For="@(() => fABudgetRequestVm.Currency)" T="string" Label="通貨" AnchorOrigin="Origin.BottomCenter" Disabled="false" Variant="Variant.Text" Dense="true" ValueChanged="AddCurrencyTextChanged">
+								@foreach (var item in dataVm.RateVms)
+								{
+									<MudSelectItem T="string" Value="@item.Currency">@item.Currency</MudSelectItem>
+								}
+							</MudSelect>
+						</td>
+
+					</tr>
+					<tr>
+						<th>Purchase Time Budget</th>
+						<th>Depreciation Start Time Budget</th>
+						<th>Purchase Time Estimation</th>
+						<th>Depreciation Start Time Estimation</th>
+						<th>EX Rate</th>
+					</tr>
+					<tr>
+						<td>
+							<MudTextField @bind-Value="@fABudgetRequestVm.FormattedPurchaseTimeBudget" For="@(() => fABudgetRequestVm.FormattedPurchaseTimeBudget)" Label="予算購入時期予算" InputType="InputType.Month" Disabled="true" Variant="Variant.Filled"></MudTextField>
+						</td>
+						<td>
+							<MudTextField @bind-Value="@fABudgetRequestVm.FormattedDepreciationStartTimeBudget" For="@(() => fABudgetRequestVm.FormattedDepreciationStartTimeBudget)" Label="予算減価償却開始時期予算" InputType="InputType.Month" Disabled="true" Variant="Variant.Filled"></MudTextField>
+						</td>
+						<td>
+							<MudTextField @bind-Value="@fABudgetRequestVm.FormattedPurchaseTimeEstimation" For="@(() => fABudgetRequestVm.FormattedPurchaseTimeEstimation)" Label="予測購入時期予測" InputType="InputType.Month"></MudTextField>
+						</td>
+						<td>
+							<MudTextField @bind-Value="@fABudgetRequestVm.FormattedDepreciationStartTimeEstimation" For="@(() => fABudgetRequestVm.FormattedDepreciationStartTimeEstimation)" Label="予測減価償却開始時期予測" InputType="InputType.Month" Disabled="true" Variant="Variant.Filled"></MudTextField>
+						</td>
+						<td><MudTextField @bind-Value="@fABudgetRequestVm.EXRate" For="@(() => fABudgetRequestVm.EXRate)" Label="レート" Variant="Variant.Filled" Disabled="true"></MudTextField></td>
+					</tr>
+					<tr>
+						<th>Current Investment Amount (Budget)</th>
+						<th>Previous Investment Amount (Budget)</th>
+						<th>Fixed Assets Accounted Amount (Budget)</th>
+					</tr>
+					<tr>
+						<td>
+							<MudTextField @bind-Value="@fABudgetRequestVm.CurrentInvestmentAmountBudget" For="@(() => fABudgetRequestVm.CurrentInvestmentAmountBudget)" Label="当期投資額予算" Format="#,##0" Culture="@CultureInfo.GetCultureInfo("en-US")" Variant="Variant.Filled" Disabled="true"></MudTextField>
+						</td>
+						<td>
+							<MudTextField @bind-Value="@fABudgetRequestVm.PreviousInvestmentAmountBudget" For="@(() => fABudgetRequestVm.PreviousInvestmentAmountBudget)" Label="前期投資額／部署移動予算" Format="#,##0.00" Culture="@CultureInfo.GetCultureInfo("en-US")" Variant="Variant.Filled" Disabled="true"></MudTextField>
+						</td>
+						<td>
+							<MudTextField @bind-Value="@fABudgetRequestVm.FixedAssetsAccountedAmountBudget" For="@(() => fABudgetRequestVm.FixedAssetsAccountedAmountBudget)" Label="固定資産計上額予算" Format="#,##0.00" Culture="@CultureInfo.GetCultureInfo("en-US")" Variant="Variant.Filled" Disabled="true"></MudTextField>
+						</td>
+					</tr>
+					<tr>
+						<th>Current Investment Amount (USD)</th>
+						<th>Previous Investment Amount (USD)</th>
+						<th>Fixed Assets Accounted Amount (USD)</th>
+					</tr>
+					<tr>
+						<td class="d-flex">
+							<MudTextField @bind-Value="@fABudgetRequestVm.CurrentInvestmentAmountUSD" For="@(() => fABudgetRequestVm.CurrentInvestmentAmountUSD)" Label="当期投資額(USD)" Format="#,##0.00" Culture="@CultureInfo.GetCultureInfo("en-US")" Variant="Variant.Filled" Disabled="true" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.AttachMoney" IconSize="Size.Small"></MudTextField>
+						</td>
+						<td>
+							<MudTextField @bind-Value="@fABudgetRequestVm.PreviousInvestmentAmountUSD" For="@(() => fABudgetRequestVm.PreviousInvestmentAmountUSD)" Label="前期投資額／部署移動 (USD)" Format="#,##0.00" Culture="@CultureInfo.GetCultureInfo("en-US")" Variant="Variant.Filled" Disabled="true" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.AttachMoney" IconSize="Size.Small"></MudTextField>
+						</td>
+						<td>
+							<MudTextField @bind-Value="@fABudgetRequestVm.FixedAssetsAccountedAmountUSD" For="@(() => fABudgetRequestVm.FixedAssetsAccountedAmountUSD)" Label="固定資産計上額 (USD)" Format="#,##0.00" Culture="@CultureInfo.GetCultureInfo("en-US")" Variant="Variant.Filled" Disabled="true" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.AttachMoney" IconSize="Size.Small"></MudTextField>
+						</td>
+					</tr>
+					<tr>
+						<th>Current investment amount Estimation（USD）</th>
+						<th>Previous Investment Amount Estimation (USD)</th>
+						<th>Fixed Assets Accounted Amount Estimation (USD)</th>
+					</tr>
+					<tr>
+						<td>
+							<MudTextField @bind-Value="@fABudgetRequestVm.TinhToan_FixedAssetsAccountedAmountEstimationUSD" Label="当期投資額 予測（USD)" Format="#,##0.00" Culture="@CultureInfo.GetCultureInfo("en-US")" Variant="@(DisableInputEstimation == true ?Variant.Filled : Variant.Text)" Disabled="@DisableInputEstimation" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.AttachMoney" IconSize="Size.Small"></MudTextField>
+						</td>
+						<td>
+							<MudTextField @bind-Value="@fABudgetRequestVm.TinhToan2_FixedAssetsAccountedAmountEstimationUSD" Label="前期投資額／部署移動 予測（USD)" Format="#,##0.00" Culture="@CultureInfo.GetCultureInfo("en-US")" Variant="@(DisableInputEstimation == true ?Variant.Filled : Variant.Text)" Disabled="@DisableInputEstimation" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.AttachMoney" IconSize="Size.Small"></MudTextField>
+						</td>
+						<td>
+							<MudTextField @bind-Value="@fABudgetRequestVm.FixedAssetsAccountedAmountEstimationUSD" Label="固定資産計上額 予測（USD)" Format="#,##0.00" Culture="@CultureInfo.GetCultureInfo("en-US")" Variant="@(DisableInputEstimation == true ? Variant.Filled : Variant.Text)" Disabled="@DisableInputEstimation" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.AttachMoney" IconSize="Size.Small"></MudTextField>
+						</td>
+					</tr>
+					<tr>
+						<th>Ringisho No</th>
+						<th>Appropriated Budget No</th>
+						<th>Budget Remaining</th>
+						<th colspan="2">Remark</th>
+
+					</tr>
+					<tr>
+						<td><MudTextField @bind-Value="@fABudgetRequestVm.RingishoNo" Label="稟議No" Variant="Variant.Text"></MudTextField></td>
+						<td>
+							@* <MudTextField @bind-Value="@fABudgetRequestVm.AppropriatedBudgetNo" For="@(() => fABudgetRequestVm.AppropriatedBudgetNo)" Label="充当No" Variant="Variant.Text"></MudTextField> *@
+							@if (fABudgetObjectVm == null)
+							{
+								<MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+							}
+							else if (ListAddBudgetRemaining.Count() == 0)
+							{
+								<MudSelect T="string" Label="充当No" MultiSelection="true" Disabled="@DisableInputEstimation" Value="@fABudgetRequestVm.AppropriatedBudgetNo" Variant="@(DisableInputEstimation == true ? Variant.Filled : Variant.Text)" ValueChanged="AppropriatedBudgetNoTextChanged">
+
+								</MudSelect>
+							}
+							else
+							{
+								<MudSelect T="string" Label="充当No" @bind-SelectedValues="options" HelperText="@("Budget Can Using: " + total)" MultiSelection="true" Disabled="@DisableInputEstimation" Value="@fABudgetRequestVm.AppropriatedBudgetNo" Variant="@(DisableInputEstimation == true ? Variant.Filled : Variant.Text)" ValueChanged="AppropriatedBudgetNoTextChanged">
+									@* <MudSelect T="string" Label="充当No" MultiSelection="true" Disabled="@DisableInputEstimation" @bind-Value="@fABudgetRequestVm.AppropriatedBudgetNo" @bind-SelectedValues="options" Variant="@(DisableInputEstimation == true ? Variant.Filled : Variant.Text)"> *@
+									@if (ListAddBudgetRemaining.Count() > 0)
+									{
+										@foreach (var item in ListAddBudgetRemaining)
+										{
+											<MudSelectItem T="string" Value="@item.No.ToString()">@item.No - @item.AccountText - @item.BudgetRemaining</MudSelectItem>
+										}
+									}
+								</MudSelect>
+							}
+						</td>
+						<td><MudTextField @bind-Value="@fABudgetRequestVm.BudgetRemaining" Label="予算残金額" Variant="Variant.Filled" Disabled="true"></MudTextField></td>
+						<td colspan="2">
+							<MudTextField @bind-Value="@fABudgetRequestVm.Remark" For="@(() => fABudgetRequestVm.Remark)" Label="備考" Variant="Variant.Text" AutoGrow></MudTextField>
+						</td>
+					</tr>
+				</tbody>
+			</MudSimpleTable>
+		</MudForm>
+	</DialogContent>
+	<DialogActions>
+		<MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.Save" Disabled=@disabledAddButton OnClick="@(async () => await Add())" Class="px-10">
+			@if (disabledAddButton == false)
+			{
+				<MudText>Add</MudText>
+			}
+			else
+			{
+				if (_processingAdd == true)
+				{
+					<MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+					<MudText Class="ms-2">Processing</MudText>
+				}
+			}
+		</MudButton>
+		<MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="()=>Submit()" Class="px-10">Close</MudButton>
+	</DialogActions>
+</MudDialog>
+
+<MudDialog @bind-IsVisible="visibleEdit" Options="dialogOptionEdits" Style="zoom:90%">
+	<TitleContent>
+		<MudText Typo="Typo.h6">
+			<MudIcon Icon="@Icons.Material.Filled.FormatIndentIncrease" Class="mr-3" />@AssetName
+		</MudText>
+	</TitleContent>
+	<DialogContent>
+		@if (fABudgetEditVm == null)
+		{
+			<MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+		}
+		else
+		{
+			<MudSimpleTable Hover="true" Dense="true">
+				<thead>
+					<tr>
+						<th>№</th>
+						<th>GL Account</th>
+						<th>Account Text</th>
+						<th>Priority Rank</th>
+						<th>Asset Name</th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr>
+						<td><MudText>@fABudgetEditVm.No</MudText></td>
+						<td>
+							<MudTextField @bind-Value="@fABudgetEditVm.GLACCOUNT" Label="科目ｺｰﾄﾞ" Variant="Variant.Filled" Disabled="true"></MudTextField>
+						</td>
+						<td>
+							@* <MudTextField @bind-Value="@fABudgetEditVm.AccountText" Label="科目" Variant="Variant.Text"></MudTextField> *@
+
+							<MudSelect Value="fABudgetEditVm.AccountText" T="string" Label="科目" AnchorOrigin="Origin.BottomCenter" Disabled="false" Variant="Variant.Text" Dense="true" ValueChanged="OnAccountTextChanged">
+								@foreach (var item in dataVm.AccountVms)
+								{
+									<MudSelectItem T="string" Value="@item.AccountText">@item.AccountText</MudSelectItem>
+								}
+							</MudSelect>
+						</td>
+						<td>
+							@* <MudTextField @bind-Value="@fABudgetEditVm.PriorityRank" Label="優先ﾗﾝｸ" Variant="Variant.Text"></MudTextField> *@
+
+							<MudSelect @bind-Value="fABudgetEditVm.PriorityRank" T="int?" Label="優先ﾗﾝｸ" AnchorOrigin="Origin.BottomCenter" Disabled="false" Variant="Variant.Text" Dense="true">
+								@foreach (var item in dataVm.PriorityVm)
+								{
+									<MudSelectItem T="int?" Value="@item">@item</MudSelectItem>
+								}
+							</MudSelect>
+						</td>
+						<td><MudTextField @bind-Value="@fABudgetEditVm.AssetName" Label="資産名" Variant="Variant.Text"></MudTextField></td>
+					</tr>
+					<tr>
+						<th>Person In Charge</th>
+						<th>Section Code</th>
+						<th>Segment</th>
+						<th>Section Name</th>
+						<th>Currency</th>
+
+					</tr>
+					<tr>
+						<td>
+							@* <MudTextField @bind-Value="@fABudgetEditVm.PersonInCharge" Label="担当者" Variant="Variant.Text"></MudTextField> *@
+							<MudSelect @bind-Value="fABudgetEditVm.PersonInCharge" T="string" Label="担当者" AnchorOrigin="Origin.BottomCenter" Disabled="false" Variant="Variant.Text" Dense="true">
+								@foreach (var item in dataVm.GroupEmailSendsVms)
+								{
+									<MudSelectItem T="string" Value="@item.Content">@item.Content</MudSelectItem>
+								}
+							</MudSelect>
+						</td>
+						<td>
+							<MudSelect Value="fABudgetEditVm.SectionCode" T="string" Label="部門ｺｰﾄ" AnchorOrigin="Origin.BottomCenter" Disabled="false" Variant="Variant.Text" Dense="true" ValueChanged="SectionTextChanged">
+								@foreach (var item in dataVm.SectionVms)
+								{
+									<MudSelectItem T="string" Value="@item.SectionCode">@item.SectionCode - @item.Segment - @item.SectionName</MudSelectItem>
+								}
+							</MudSelect>
+
+						</td>
+						<td>
+							<MudTextField @bind-Value="@fABudgetEditVm.Segment" Label="ｾｸﾞﾒﾝﾄ" Variant="Variant.Filled" Disabled="true"></MudTextField>
+						</td>
+						<td>
+							<MudTextField @bind-Value="@fABudgetEditVm.SectionName" Label="部門名" Variant="Variant.Filled" Disabled="true"></MudTextField>
+						</td>
+						<td>
+							<MudSelect @bind-Value="fABudgetEditVm.Currency" T="string" Label="通貨" AnchorOrigin="Origin.BottomCenter" Disabled="true" Variant="Variant.Filled">
+								@foreach (var item in fABudgetEditVm.RateVms)
+								{
+									<MudSelectItem T="string" Value="@item.Currency">@item.Currency</MudSelectItem>
+								}
+							</MudSelect>
+						</td>
+
+					</tr>
+					<tr>
+						<th>Purchase Time Estimation</th>
+						<th>Depreciation Start Time Estimation</th>
+						<th>Purchase Time Budget</th>
+						<th>Depreciation Start Time Budget</th>
+						<th>EX Rate</th>
+					</tr>
+					<tr>
+						<td>
+							<div style="display: flex; align-items: center;">
+								<MudTextField @bind-Value="@fABudgetEditVm.FormattedPurchaseTimeEstimation" Disabled=@(Convert.ToBoolean(fABudgetEditVm.Status) == true ? false : true) Variant="@(Convert.ToBoolean(fABudgetEditVm.Status) == true ? Variant.Text : Variant.Filled)" Label="予測購入時期予測" InputType="InputType.Month"></MudTextField>
+								<MudTooltip Text="@(Convert.ToBoolean(fABudgetEditVm.Status) == true ? "Cancel" : "Uncancel")" Color="Color.Secondary" Placement="Placement.Top">
+									<MudCheckBox @bind-Checked="@fABudgetEditVm.Status" @onclick="ToggleCancel" Color="Color.Secondary" Dense="true" Size="Size.Small" CheckedIcon="@Icons.Material.Outlined.Cancel" UncheckedIcon="@Icons.Material.Filled.Cancel"></MudCheckBox>
+								</MudTooltip>
+							</div>
+						</td>
+						<td>
+							<MudTextField @bind-Value="@fABudgetEditVm.FormattedDepreciationStartTimeEstimation" Label="予測減価償却開始時期予測" InputType="InputType.Month" Disabled=@(Convert.ToBoolean(fABudgetEditVm.Status) == true ? false : true) Variant="@(Convert.ToBoolean(fABudgetEditVm.Status) == true ? Variant.Text : Variant.Filled)"></MudTextField>
+						</td>
+						<td>
+							<MudTextField @bind-Value="@fABudgetEditVm.PurchaseTimeBudget" Label="予算購入時期予算" Format="MM/yy" Disabled="true" Variant="Variant.Filled"></MudTextField>
+						</td>
+						<td>
+							<MudTextField @bind-Value="@fABudgetEditVm.DepreciationStartTimeBudget" Label="予算減価償却開始時期予算" Format="MM/yy" Disabled="true" Variant="Variant.Filled"></MudTextField>
+						</td>
+						<td><MudTextField @bind-Value="@fABudgetEditVm.EXRate" Label="レート" Variant="Variant.Filled" Disabled="true"></MudTextField></td>
+					</tr>
+					<tr>
+						<th>Current Investment Amount (Budget)</th>
+						<th>Previous Investment Amount (Budget)</th>
+						<th>Fixed Assets Accounted Amount (Budget)</th>
+					</tr>
+					<tr>
+						<td>
+							<MudTextField @bind-Value="@fABudgetEditVm.CurrentInvestmentAmountBudget" Label="当期投資額予算" Format="#,##0" Culture="@CultureInfo.GetCultureInfo("en-US")" Variant="Variant.Filled" Disabled="true"></MudTextField>
+						</td>
+						<td>
+							<MudTextField @bind-Value="@fABudgetEditVm.PreviousInvestmentAmountBudget" Label="前期投資額／部署移動予算" Format="#,##0.00" Culture="@CultureInfo.GetCultureInfo("en-US")" Variant="Variant.Filled" Disabled="true"></MudTextField>
+						</td>
+						<td>
+							<MudTextField @bind-Value="@fABudgetEditVm.FixedAssetsAccountedAmountBudget" Label="固定資産計上額予算" Format="#,##0.00" Culture="@CultureInfo.GetCultureInfo("en-US")" Variant="Variant.Filled" Disabled="true"></MudTextField>
+						</td>
+					</tr>
+					<tr>
+						<th>Current Investment Amount (USD)</th>
+						<th>Previous Investment Amount (USD)</th>
+						<th>Fixed Assets Accounted Amount (USD)</th>
+					</tr>
+					<tr>
+						<td>
+							<MudTextField @bind-Value="@fABudgetEditVm.CurrentInvestmentAmountUSD" Label="当期投資額(USD)" Format="#,##0.00" Culture="@CultureInfo.GetCultureInfo("en-US")" Variant="Variant.Filled" Disabled="true" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.AttachMoney" IconSize="Size.Small"></MudTextField>
+						</td>
+						<td>
+							<MudTextField @bind-Value="@fABudgetEditVm.PreviousInvestmentAmountUSD" Label="前期投資額／部署移動 (USD)" Format="#,##0.00" Culture="@CultureInfo.GetCultureInfo("en-US")" Variant="Variant.Filled" Disabled="true" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.AttachMoney" IconSize="Size.Small"></MudTextField>
+						</td>
+						<td>
+							<MudTextField @bind-Value="@fABudgetEditVm.FixedAssetsAccountedAmountUSD" Label="固定資産計上額 (USD)" Format="#,##0.00" Culture="@CultureInfo.GetCultureInfo("en-US")" Variant="Variant.Filled" Disabled="true" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.AttachMoney" IconSize="Size.Small"></MudTextField>
+						</td>
+					</tr>
+					<tr>
+						<th>Current investment amount Estimation（USD）</th>
+						<th>Previous Investment Amount Estimation (USD)</th>
+						<th>Fixed Assets Accounted Amount Estimation (USD)</th>
+					</tr>
+					<tr>
+						<td>
+							<MudTextField Value="@fABudgetEditVm.CurrentInvestmentAmountEstimationUSD" T="decimal?" ValueChanged="CurrentInvestmentAmountEstimationUSDChanged" Label="当期投資額 予測（USD)" Format="#,##0.00" Culture="@CultureInfo.GetCultureInfo("en-US")" Variant="Variant.Text" Disabled="false" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.AttachMoney" IconSize="Size.Small"></MudTextField>
+						</td>
+						<td>
+							<MudTextField Value="@fABudgetEditVm.PreviousInvestmentAmountEstimationUSD" T="decimal?" ValueChanged="PreviousInvestmentAmountEstimationUSDChanged" Label="前期投資額／部署移動 予測（USD)" Format="#,##0.00" Culture="@CultureInfo.GetCultureInfo("en-US")" Variant="Variant.Text" Disabled="false" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.AttachMoney" IconSize="Size.Small"></MudTextField>
+						</td>
+						<td>
+							<MudTextField @bind-Value="@fABudgetEditVm.FixedAssetsAccountedAmountEstimationUSD" Label="固定資産計上額 予測（USD)" Format="#,##0.00" Culture="@CultureInfo.GetCultureInfo("en-US")" Variant="Variant.Text" Disabled="true" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.AttachMoney" IconSize="Size.Small"></MudTextField>
+						</td>
+					</tr>
+					<tr>
+						<th>Ringisho No</th>
+						<th>Appropriated Budget No</th>
+						<th>Budget Remaining</th>
+						<th colspan="2">Remark</th>
+
+					</tr>
+					<tr>
+						<td>
+							<div style="display: flex; align-items: center;">
+								<MudTextField @bind-Value="@fABudgetEditVm.RingishoNo" Label="稟議No" HelperText="@(Convert.ToBoolean(fABudgetEditVm.RingishoProcess) == true ? "Ringisho In Processing" : "")" Disabled=@(Convert.ToBoolean(fABudgetEditVm.RingishoProcess) == false ? false : true) Variant="@(Convert.ToBoolean(fABudgetEditVm.RingishoProcess) == false ? Variant.Text : Variant.Filled)"></MudTextField>
+								<MudTooltip Text="@(Convert.ToBoolean(fABudgetEditVm.RingishoProcess) == false ? "In Process" : "Uncheck - Input Ringisho No")" Color="Color.Secondary" Placement="Placement.Top">
+									<MudCheckBox @bind-Checked="@fABudgetEditVm.RingishoProcess" Dense="false" Color="Color.Primary"></MudCheckBox>
+								</MudTooltip>
+							</div>
+						</td>
+						<td>
+							@* <MudTextField @bind-Value="@fABudgetEditVm.AppropriatedBudgetNo" HelperText="@("Budget Can Using: " + fABudgetEditVm.BudgetCanUsing)" Label="充当No" Variant="Variant.Filled" Disabled="true"></MudTextField> *@
+							@if (fABudgetObjectVm == null)
+							{
+								<MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+							}
+							else if (ListAddBudgetRemainingEdit.Count() == 0)
+							{
+								<MudSelect T="string" Label="充当No" MultiSelection="true" Disabled="@DisableInputEstimation" Value="@fABudgetEditVm.AppropriatedBudgetNo" Variant="@(DisableInputEstimation == true ? Variant.Filled : Variant.Text)" ValueChanged="AppropriatedBudgetNoEditTextChanged">
+
+								</MudSelect>
+							}
+							else
+							{
+								<MudSelect T="string" Label="充当No" @bind-SelectedValues="@optionsEdit" HelperText="@("Total Budget Can Using: $ " + totalBudgetEdit )" MultiSelection="true" Disabled="@DisableInputEstimation" Variant="@(DisableInputEstimation == true ? Variant.Filled : Variant.Text)" ValueChanged="AppropriatedBudgetNoEditTextChanged">
+									@* <MudSelect T="string" Label="充当No" MultiSelection="true" Disabled="@DisableInputEstimation" @bind-Value="@fABudgetRequestVm.AppropriatedBudgetNo" @bind-SelectedValues="options" Variant="@(DisableInputEstimation == true ? Variant.Filled : Variant.Text)"> *@
+									@if (ListAddBudgetRemainingEdit.Count() > 0)
+									{
+										@foreach (var item in ListAddBudgetRemainingEdit)
+										{
+											<MudSelectItem T="string" Value="@item.No.ToString()">@item.No - @item.AccountText - @item.BudgetRemaining</MudSelectItem>
+										}
+									}
+								</MudSelect>
+							}
+
+						</td>
+						<td><MudTextField @bind-Value="@fABudgetEditVm.BudgetRemaining" HelperText="@("Total Budget Shared: " + "$ " +fABudgetEditVm.BudgetSharing)" Label="予算残金額" Variant="Variant.Filled" Disabled="true"></MudTextField></td>
+						<td colspan="2">
+							<MudTextField @bind-Value="@fABudgetEditVm.Remark" Label="備考" Variant="Variant.Text" AutoGrow></MudTextField>
+						</td>
+					</tr>
+				</tbody>
+			</MudSimpleTable>
+		}
+
+
+	</DialogContent>
+	<DialogActions>
+		<MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.Save" Disabled=@disabledSaveButton OnClick="Save" Class="px-10">Save</MudButton>
+		<MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitDetail" Class="px-10">Close</MudButton>
+	</DialogActions>
+</MudDialog>
+
+
+
+
+
+@code {
+	[CascadingParameter]
+	private Task<AuthenticationState> AuthenticationStateTask { get; set; }
+	private bool dense = true;
+	private bool hover = true;
+	private bool striped = true;
+	private bool bordered = true;
+	private string searchString1 = "";
+	private string none = "none";
+	private int? _zoom = 70;
+	private int? _zoomContent = 100;
+	private bool _loading;
+	private bool _loadingDownload;
+	decimal? total = 0;
+	decimal? totalBudgetEdit = 0;
+	private FABudgetVm fABudgetVm { get; set; } = new FABudgetVm();
+	private FABudgetObjectVm fABudgetObjectVm { get; set; }
+	private FABudgetRequestEditVm fABudgetEditVm = null;
+	private FABudgetRequestVm fABudgetRequestVm = new FABudgetRequestVm();
+	private DataVm dataVm { get; set; } = new DataVm();
+	private HashSet<FABudgetVm> selectedItems = new HashSet<FABudgetVm>();
+	public List<FABudgetVm>? ListAddBudgetRemaining { get; set; } = new List<FABudgetVm>();
+	public List<FABudgetVm>? ListAddBudgetRemainingEdit { get; set; } = new List<FABudgetVm>();
+	MudForm form;
+	private EventCallback<TableRowClickEventArgs<FABudgetVm>> OnRowClickCallback { get; set; }
+	private IEnumerable<FABudgetVm>? fABudgetVms = new List<FABudgetVm>();
+	private IEnumerable<FABudgetVm> ElementsConfirmed = new List<FABudgetVm>();
+	private IEnumerable<string> options { get; set; } = new HashSet<string>() { "" };
+	private IEnumerable<string> optionsEdit { get; set; } = new HashSet<string>();
+
+
+	List<string?> _val = new List<string?>();
+
+	//Dialog
+	private DialogOptions dialogOptions = new() { MaxWidth = MaxWidth.ExtraExtraLarge, FullWidth = true };
+	private DialogOptions dialogOptionEdits = new() { MaxWidth = MaxWidth.ExtraExtraLarge, FullWidth = true };
+
+	public bool Basic_CheckBox2 { get; set; } = false;
+	private void OpenDialog()
+	{
+		visible = true;
+		fABudgetRequestVm.No = fABudgetObjectVm.FABudgetAddVm.No;
+	}
+	private void CloseDialog()
+	{
+		visible = false;
+		fABudgetEditVm = null;
+	}
+	private async Task OpenDialogEdit()
+	{
+		visibleEdit = true;
+		_val = new List<string?>();
+
+	}
+	private void CloseDialogEdit()
+	{
+		visibleEdit = false;
+		fABudgetEditVm = null;
+	}
+	private bool visible;
+	private bool visibleEdit;
+	async Task Submit() => visible = false;
+	void SubmitDetail() => visibleEdit = false;
+	IList<IBrowserFile> files = new List<IBrowserFile>();
+	private bool _processing = false;
+	private bool _processingAdd = false;
+	bool disabledSaveButton = false;
+	bool disabledAddButton = false;
+
+	// protected override async Task OnAfterRenderAsync(bool firstRender)
+	// {
+	// 	if (firstRender)
+	// 	{
+	// 		// Gọi JavaScript sau khi bảng được render
+	// 		await JS.InvokeVoidAsync("updateStickyColumns", ".mud-table",7);
+	// 	}
+	// }
+	protected override async Task OnInitializedAsync()
+	{
+
+		var authenticationState = await AuthenticationStateTask;
+		var user = authenticationState.User;
+		OnRowClickCallback = EventCallback.Factory.Create<TableRowClickEventArgs<FABudgetVm>>(this, OnRowFABudgetClick);
+		// Kiểm tra nếu người dùng không được xác thực
+		if (user.Identity == null || !user.Identity.IsAuthenticated)
+		{
+			//	var returnUrl = NavigationManager.ToBaseRelativePath(Navigation.Uri);
+			NavigationManager.NavigateTo("/pages/authentication/login", true);
+			return;
+		}
+
+		// Lấy dữ liệu khi người dùng đã được xác thực
+		try
+		{
+			_loading = true;
+
+			var serviceResponse = await _faClient.GetFAAsync();
+			var serviceResponseData = await _faClient.GetDataAsync();
+
+			fABudgetObjectVm = serviceResponse.Data;
+			fABudgetVms = fABudgetObjectVm.FABudgetVms;
+			dataVm = serviceResponseData.Data;
+			_loading = false;
+		}
+		catch (Exception ex)
+		{
+			// Xử lý lỗi khi gọi API
+			snackbar.Add("Error occurred.", Severity.Warning);
+			Console.WriteLine($"Error fetching data: {ex.Message}");
+			Console.WriteLine($"Error fetching data: {ex.Source}");
+			Console.WriteLine($"Error fetching data: {ex.Data}");
+			Console.WriteLine($"Error fetching data: {ex.InnerException}");
+			Console.WriteLine($"Error fetching data: {ex.StackTrace}");
+			Console.WriteLine($"Error fetching data: {ex.ToString}");
+		}
+
+
+	}
+	private async Task LoadFABudget()
+	{
+		_loading = true;
+		var serviceResponse = await _faClient.GetFAAsync();
+
+		fABudgetObjectVm = serviceResponse.Data;
+		fABudgetVms = fABudgetObjectVm.FABudgetVms;
+		_loading = false;
+	}
+	private bool FilterFunc1(FABudgetVm fABudgetVms) {
+		var result = FilterFunc(fABudgetVms, searchString1);
+		return result;
+	}
+
+	private bool FilterFunc(FABudgetVm element, string searchString)
+	{
+		try
+		{
+			if (string.IsNullOrWhiteSpace(searchString))
+				return true;
+			if (Convert.ToString(element.No).Contains(searchString, StringComparison.OrdinalIgnoreCase))
+				return true;
+			if (element.AssetName.Contains(searchString, StringComparison.OrdinalIgnoreCase))
+				return true;
+			// if (element.AccountText.Contains(searchString, StringComparison.OrdinalIgnoreCase))
+			// 	return true;
+			// if (element.GLACCOUNT.ToString().Contains(searchString, StringComparison.OrdinalIgnoreCase))
+			// 	return true;
+			if (element.PersonInCharge.ToString().Contains(searchString, StringComparison.OrdinalIgnoreCase))
+				return true;
+			return false;
+
+		}
+		catch (Exception ex)
+		{
+			return false;
+			Console.WriteLine(ex.ToString());
+		}
+	}
+	private async Task Zoom(int value)
+	{
+		//1: zoom to ; 0:zoom nho
+		// Zoom nho
+		if (value == 0)
+		{
+			_zoomContent = _zoomContent - 5;
+		}
+		else
+		{
+			_zoomContent = _zoomContent + 5;
+		}
+		// Gọi hàm JS để thay đổi zoom
+		await JS.InvokeVoidAsync("setZoom", _zoomContent);
+		StateHasChanged();
+	}
+	private async Task Add()
+	{
+
+		await form.Validate();
+
+		if (form.IsValid)
+		{
+			if (fABudgetRequestVm.CurrentInvestmentAmountEstimationUSD > total)
+			{
+				snackbar.Add("Current Investment Amount Estimation (USD) Must Be Less Than Budget has been Sharing.", Severity.Warning);
+				return;
+			}
+
+			_processingAdd = true;
+			disabledAddButton = true;
+			var result = await _faClient.PostAsync(fABudgetRequestVm);
+			if (result.StatusCode == System.Net.HttpStatusCode.OK)
+			{
+				fABudgetRequestVm = new FABudgetRequestVm();
+				ListAddBudgetRemaining = new List<FABudgetVm>();
+				DisableInputEstimation = true;
+				await LoadFABudget();
+				snackbar.Add("Add Successfully", Severity.Success);
+				CloseDialog();
+			}
+			else
+			{
+				snackbar.Add("Error occurred.", Severity.Warning);
+			}
+			_processingAdd = false;
+			disabledAddButton = false;
+
+			StateHasChanged();
+
+		}
+
+	}
+
+	//Dialog
+
+	private async Task UploadFiles(InputFileChangeEventArgs e)
+	{
+		using var content = new MultipartFormDataContent();
+		// Get the selected file
+		var file = e.File;
+		// Check if the file is null then return from the method
+		if (file == null)
+			return;
+		if (!IsExcelFile(file.ContentType))
+		{
+			// Handle the case when the file is not in Excel format
+			// You may want to show a message to the user or take other actions
+			snackbar.Add("Không đúng định dạng File", Severity.Warning);
+			return;
+		}
+
+		files.Add(file);
+		var fileContent = new StreamContent(file.OpenReadStream());
+		fileContent.Headers.ContentType = new MediaTypeHeaderValue(file.ContentType);
+		content.Add(content: fileContent, name: "\"files\"", fileName: file.Name);
+
+		var response = await httpClient.PostAsync("/api/PackingSheet/uploadFile", content);
+		var attachmentObject = await response.Content.ReadFromJsonAsync<ServiceResponse<FABudgetVm>>();
+		if (attachmentObject.IsSuccess == true && attachmentObject.Message == "true")
+		{
+			var a = attachmentObject.Data;
+			disabledSaveButton = false;
+
+		}
+		else
+		{
+			snackbar.Add("Invoice đã tồn tại", Severity.Warning);
+		}
+		StateHasChanged();
+	}
+	private async Task Save()
+	{
+		@if (fABudgetEditVm.BudgetRemaining < 0)
+		{
+			snackbar.Add("BudgetRemaining cannot set value minus.", Severity.Warning);
+		}
+		else if (fABudgetEditVm.BudgetCanUsing < 0) snackbar.Add("BudgetCanUsing cannot set value minus.", Severity.Warning);
+		else
+		{
+			_processing = true;
+			disabledSaveButton = true;
+			var result = await _faClient.PutAsync(fABudgetEditVm);
+
+			if (result.StatusCode == System.Net.HttpStatusCode.OK)
+			{
+				await LoadFABudget();
+				snackbar.Add("Update Successfully", Severity.Success);
+
+			}
+			else
+			{
+				snackbar.Add("Error occurred.", Severity.Warning);
+			}
+			_processing = false;
+			disabledSaveButton = false;
+			CloseDialogEdit();
+			StateHasChanged();
+		}
+	}
+	private bool IsExcelFile(string contentType)
+	{
+		// Check if the content type indicates an Excel file
+		return contentType switch
+		{
+			"application/vnd.ms-excel" => true,
+			"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" => true,
+			_ => false,
+		};
+	}
+	//Edit
+	public string? AssetName { get; set; } = "";
+	async Task OnRowFABudgetClick(TableRowClickEventArgs<FABudgetVm> args)
+	{
+		AssetName = args.Item.AssetName;
+		await Edit(args.Item.Id, AssetName);
+	}
+	private async Task Edit(int id, string? assetName)
+	{
+		await OpenDialogEdit();
+		fABudgetEditVm = null;
+		StateHasChanged();
+		AssetName = assetName;
+		var result = await _faClient.GetDetailByIdAsync(id);
+		fABudgetEditVm = result.Data;
+
+		await LoadAddBudgetRemainingEdit(fABudgetEditVm);
+
+		StateHasChanged();
+	}
+	decimal? _CurrentInvestmentAmountEstimationUSDTemp = 0;
+	async Task LoadAddBudgetRemainingEdit(FABudgetRequestEditVm fABudget)
+	{
+		_CurrentInvestmentAmountEstimationUSDTemp = fABudget.CurrentInvestmentAmountEstimationUSD;
+		ListAddBudgetRemainingEdit = fABudget.ListBudgetRemainingEdit.Where(p => p.Segment == fABudget.Segment && p.No != fABudget.No).ToList();
+		if (ListAddBudgetRemainingEdit.Count == 0)
+		{
+			fABudgetRequestVm.AppropriatedBudgetNo = null;
+			//	DisableInputEstimation = true;
+			//	total = 0;
+		}
+		else
+		{
+			var res = OnListEditBudgetRemainingChanged(fABudget);
+			DisableInputEstimation = false;
+			totalBudgetEdit = res;
+		}
+	}
+
+	private void ToggleCancel()
+	{
+		fABudgetEditVm.Status = !fABudgetEditVm.Status;
+		if (fABudgetEditVm.Status == false)
+		{
+			_val.Add(Convert.ToString(fABudgetEditVm.PurchaseTimeEstimation));
+			_val.Add(Convert.ToString(fABudgetEditVm.CurrentInvestmentAmountEstimationUSD));
+
+			fABudgetEditVm.PurchaseTimeEstimation = null;
+			fABudgetEditVm.CurrentInvestmentAmountEstimationUSD = 0;
+			//	fABudgetEditVm.TinhToan_FixedAssetsAccountedAmountEstimationUSD = 0;
+			CurrentInvestmentAmountEstimationUSDChanged(0);
+			//	fABudgetEditVm.FixedAssetsAccountedAmountEstimationUSD = (fABudgetEditVm.CurrentInvestmentAmountEstimationUSD ?? 0) + (fABudgetEditVm.PreviousInvestmentAmountEstimationUSD ?? 0);
+		}
+		else
+		{
+			if (_val.Count() == 2)
+			{
+				fABudgetEditVm.PurchaseTimeEstimation = _val[0] != null ? Convert.ToDateTime(_val[0]) : null;
+				CurrentInvestmentAmountEstimationUSDChanged(string.IsNullOrEmpty(_val[1]) == false ? Convert.ToDecimal(_val[1]) : 0);
+				//	fABudgetEditVm.CurrentInvestmentAmountEstimationUSD = string.IsNullOrEmpty(_val[1]) == false ?  Convert.ToDecimal(_val[1]) : 0;
+
+				_val = new List<string?>();
+			}
+			else
+			{
+				fABudgetEditVm.PurchaseTimeEstimation = DateTime.Now;
+				CurrentInvestmentAmountEstimationUSDChanged(0);
+			}
+		}
+
+
+	}
+	//decimal originalValueBudgetRemaining = 0;
+	void UpdateValue(decimal? value)
+	{
+		if (!string.IsNullOrEmpty(fABudgetEditVm.AppropriatedBudgetNo)) fABudgetEditVm.BudgetCanUsing += fABudgetEditVm.CurrentInvestmentAmountEstimationUSD - value;
+
+		fABudgetEditVm.CurrentInvestmentAmountEstimationUSD = value;
+		fABudgetEditVm.FixedAssetsAccountedAmountEstimationUSD = (fABudgetEditVm.CurrentInvestmentAmountEstimationUSD ?? 0) + (fABudgetEditVm.PreviousInvestmentAmountEstimationUSD ?? 0);
+
+		if (fABudgetEditVm.BudgetRemaining > 0 && (fABudgetEditVm.CurrentInvestmentAmountUSD == 0 || fABudgetEditVm.CurrentInvestmentAmountUSD == null))
+		{
+			//originalValueBudgetRemaining = fABudgetEditVm.BudgetRemaining;
+			fABudgetEditVm.BudgetRemaining = fABudgetEditVm._initialBudgetRemaining - fABudgetEditVm.CurrentInvestmentAmountEstimationUSD - fABudgetEditVm.BudgetSharing;
+		}
+		else
+		{
+			fABudgetEditVm.BudgetRemaining = fABudgetEditVm.CurrentInvestmentAmountUSD - fABudgetEditVm.CurrentInvestmentAmountEstimationUSD - fABudgetEditVm.BudgetSharing;
+		}
+
+		// Check CurrentInvestmentAmountUSD đã sử dụng hết hay chưa.
+		// Check edit từ Budget thêm mới hay từ cũ
+		if (fABudgetEditVm.CurrentInvestmentAmountUSD == null)
+		{
+			var _currentInvestmentAmountUSDRemaining = fABudgetEditVm.CurrentInvestmentAmountEstimationUSD - fABudgetEditVm.BudgetSharing;
+			if (/* totalBudgetEdit < _currentInvestmentAmountUSDRemaining  && */ fABudgetEditVm.AppropriatedBudgetNo != null && _currentInvestmentAmountUSDRemaining > 0)
+			{
+				fABudgetEditVm.BudgetRemaining = totalBudgetEdit - fABudgetEditVm.CurrentInvestmentAmountEstimationUSD;
+				if (fABudgetEditVm.BudgetRemaining > 0)
+				{
+					fABudgetEditVm.BudgetRemaining = 0;
+					fABudgetEditVm.BudgetCanUsing = totalBudgetEdit;
+				}
+				else
+				{
+					fABudgetEditVm.BudgetRemaining = totalBudgetEdit - fABudgetEditVm.CurrentInvestmentAmountEstimationUSD;
+				}
+			}
+			// else if (_currentInvestmentAmountUSDRemaining > totalBudgetEdit && fABudgetEditVm.AppropriatedBudgetNo != null)
+			// {
+
+			// 	fABudgetEditVm.BudgetRemaining = totalBudgetEdit - fABudgetEditVm.CurrentInvestmentAmountEstimationUSD;
+			// 	if (fABudgetEditVm.BudgetRemaining > 0)
+			// 	{
+			// 		fABudgetEditVm.BudgetRemaining = 0;
+			// 		fABudgetEditVm.BudgetCanUsing = totalBudgetEdit;
+			// 	}
+			// 	else
+			// 	{
+			// 		fABudgetEditVm.BudgetRemaining = totalBudgetEdit - fABudgetEditVm.CurrentInvestmentAmountEstimationUSD;
+			// 	}
+
+			// }
+		}
+		else
+		{
+			var _currentInvestmentAmountUSDRemaining = fABudgetEditVm.CurrentInvestmentAmountUSD - fABudgetEditVm.CurrentInvestmentAmountEstimationUSD - fABudgetEditVm.BudgetSharing;
+			if (totalBudgetEdit > fABudgetEditVm.CurrentInvestmentAmountUSD && fABudgetEditVm.AppropriatedBudgetNo != null && _currentInvestmentAmountUSDRemaining < 0)
+			{
+				fABudgetEditVm.BudgetRemaining = totalBudgetEdit - fABudgetEditVm.CurrentInvestmentAmountEstimationUSD;
+				if (fABudgetEditVm.BudgetRemaining > 0)
+				{
+					fABudgetEditVm.BudgetRemaining = 0;
+					fABudgetEditVm.BudgetCanUsing = totalBudgetEdit;
+				}
+				else
+				{
+					fABudgetEditVm.BudgetRemaining = totalBudgetEdit - fABudgetEditVm.CurrentInvestmentAmountEstimationUSD;
+				}
+			}
+		}
+	}
+
+	//Value change Edit
+	private void CurrentInvestmentAmountEstimationUSDChanged(decimal? value)
+	{
+		// Gọi phương thức trong ViewModel để cập nhật danh sách
+		try
+		{
+			UpdateValue(value);
+		}
+		catch (Exception)
+		{
+			snackbar.Add("Không tìm được giá trị.", Severity.Warning);
+		}
+
+	}
+	private void PreviousInvestmentAmountEstimationUSDChanged(decimal? value)
+	{
+		// Gọi phương thức trong ViewModel để cập nhật danh sách
+		try
+		{
+			fABudgetEditVm.PreviousInvestmentAmountEstimationUSD = value;
+			fABudgetEditVm.FixedAssetsAccountedAmountEstimationUSD = (fABudgetEditVm.CurrentInvestmentAmountEstimationUSD ?? 0) + (fABudgetEditVm.PreviousInvestmentAmountEstimationUSD ?? 0);
+			// fABudgetEditVm.BudgetRemaining = fABudgetEditVm.CurrentInvestmentAmountUSD - fABudgetEditVm.FixedAssetsAccountedAmountEstimationUSD;
+		}
+		catch (Exception)
+		{
+			snackbar.Add("Không tìm được giá trị.", Severity.Warning);
+		}
+
+	}
+
+	//
+	private async Task ExportData()
+	{
+		_loadingDownload = true;
+		var fileBytes = await _faClient.ExportAsync();
+
+		var fileName = $"Export{DateTime.Now.ToString("dd-MMM-yyyy", System.Globalization.CultureInfo.InvariantCulture)}.xlsx";
+		await JS.InvokeAsync<object>("saveAsFile", fileName, Convert.ToBase64String(fileBytes));
+		_loadingDownload = false;
+		StateHasChanged();
+	}
+	private async Task ExportDataPO()
+	{
+		_loadingDownload = true;
+		var fileBytes = await _faClient.ExportPOAsync();
+
+		var fileName = $"Export{DateTime.Now.ToString("dd-MMM-yyyy", System.Globalization.CultureInfo.InvariantCulture)}.xlsx";
+		await JS.InvokeAsync<object>("saveAsFile", fileName, Convert.ToBase64String(fileBytes));
+		_loadingDownload = false;
+		StateHasChanged();
+	}
+	private void OnAccountTextChanged(string value)
+	{
+		// Gọi phương thức trong ViewModel để cập nhật danh sách
+		try
+		{
+			var glAccount = dataVm.AccountVms.Where(p => p.AccountText == value).SingleOrDefault()?.GLACCOUNT;
+			fABudgetEditVm.UpdateGLAccount_AccountText(value, glAccount);
+		}
+		catch (Exception)
+		{
+			snackbar.Add("Không tìm được giá trị.", Severity.Warning);
+		}
+
+	}
+	private void SectionTextChanged(string value)
+	{
+		// Gọi phương thức trong ViewModel để cập nhật danh sách
+		try
+		{
+			var sectionVm = dataVm.SectionVms.Where(p => p.SectionCode == value).SingleOrDefault();
+			fABudgetEditVm.UpdateSectionCode_Segment_SectionName(sectionVm);
+		}
+		catch (Exception)
+		{
+			snackbar.Add("Không tìm được giá trị.", Severity.Warning);
+		}
+
+	}
+
+	//Add
+	private void AddOnAccountTextChanged(string value)
+	{
+		// Gọi phương thức trong ViewModel để cập nhật danh sách
+		try
+		{
+			var glAccount = dataVm.AccountVms.Where(p => p.AccountText == value).SingleOrDefault()?.GLACCOUNT;
+			fABudgetRequestVm.UpdateGLAccount_AccountText(value, glAccount);
+		}
+		catch (Exception)
+		{
+			snackbar.Add("Không tìm được giá trị.", Severity.Warning);
+		}
+
+	}
+	bool DisableInputEstimation = true;
+	string _saveTempData { get; set; }
+	private void AddSectionTextChanged(string value)
+	{
+		// Gọi phương thức trong ViewModel để cập nhật danh sách
+		try
+		{
+			var sectionVm = dataVm.SectionVms.Where(p => p.SectionCode == value).SingleOrDefault();
+			fABudgetRequestVm.UpdateSectionCode_Segment_SectionName(sectionVm);
+
+
+			//
+			if (_saveTempData == null)
+			{
+				_saveTempData = value;
+			}
+			else if (_saveTempData == value)
+			{
+				return;
+			}
+
+			ListAddBudgetRemaining = fABudgetObjectVm.ListBudgetRemaining.Where(p => p.Segment == sectionVm.Segment).ToList();
+			if (ListAddBudgetRemaining.Count == 0)
+			{
+				fABudgetRequestVm.AppropriatedBudgetNo = null;
+				DisableInputEstimation = true;
+				fABudgetRequestVm.TinhToan_FixedAssetsAccountedAmountEstimationUSD = 0;
+				fABudgetRequestVm.TinhToan2_FixedAssetsAccountedAmountEstimationUSD = 0;
+				total = 0;
+			}
+			else
+			{
+				OnListAddBudgetRemainingChanged();
+				DisableInputEstimation = false;
+				total = 0;
+				fABudgetRequestVm.AppropriatedBudgetNo = null;
+				fABudgetRequestVm.TinhToan_FixedAssetsAccountedAmountEstimationUSD = 0;
+				fABudgetRequestVm.TinhToan2_FixedAssetsAccountedAmountEstimationUSD = 0;
+			}
+
+
+		}
+		catch (Exception)
+		{
+			snackbar.Add("Không tìm được giá trị.", Severity.Warning);
+		}
+		StateHasChanged();
+
+	}
+	private void AddCurrencyTextChanged(string value)
+	{
+		// Gọi phương thức trong ViewModel để cập nhật danh sách
+		try
+		{
+			var rate = dataVm.RateVms.Where(p => p.Currency == value).SingleOrDefault()?.Current;
+			fABudgetRequestVm.UpdateCurrency_Rate(value, rate);
+		}
+		catch (Exception)
+		{
+			snackbar.Add("Không tìm được giá trị.", Severity.Warning);
+		}
+
+	}
+
+	private void AppropriatedBudgetNoTextChanged(string? value)
+	{
+		// Gọi phương thức trong ViewModel để cập nhật danh sách
+		// Update. Yêu cầu khi Add new, Budget remaining se = 0
+		try
+		{
+			if (!string.IsNullOrEmpty(value))
+			{
+				string[] _value = value.Split(',');
+				// Vì Budget remaining se = 0, nên chỗ này comment lại. Sau này nếu cần hiển thị thì lại hiện ra.
+				// Mở toàn bộ phần comment là được. Bên thuộc tính vẫn dữ nguyên.
+
+				total = 0;
+				foreach (var item in _value)
+				{
+					var budgetRemining = fABudgetObjectVm.ListBudgetRemaining.Where(p => p.No == int.Parse(item)).SingleOrDefault()?.BudgetRemaining;
+					if (budgetRemining != null)
+					{
+						total = total + budgetRemining;
+					}
+				}
+				//	fABudgetRequestVm.UpdateBudgetRemaining(total, value);
+				fABudgetRequestVm.AppropriatedBudgetNo = value;
+			}
+			else
+			{
+				//	fABudgetRequestVm.UpdateBudgetRemaining(null, null);
+				total = 0;
+				fABudgetRequestVm.AppropriatedBudgetNo = null;
+
+			}
+		}
+		catch (Exception ex)
+		{
+			snackbar.Add(ex.Message, Severity.Warning);
+		}
+
+	}
+
+	private void AppropriatedBudgetNoEditTextChanged(string? value)
+	{
+		// Gọi phương thức trong ViewModel để cập nhật danh sách
+		// Update. Yêu cầu khi Add new, Budget remaining se = 0
+		try
+		{
+			if (!string.IsNullOrEmpty(value))
+			{
+				string[] _value = value.Split(',').Select(x => x.Trim()).ToArray();
+				// Vì Budget remaining se = 0, nên chỗ này comment lại. Sau này nếu cần hiển thị thì lại hiện ra.
+				// Mở toàn bộ phần comment là được. Bên thuộc tính vẫn dữ nguyên.
+
+				totalBudgetEdit = fABudgetEditVm.CurrentInvestmentAmountUSD == null ? _CurrentInvestmentAmountEstimationUSDTemp : 0;
+				foreach (var item in _value)
+				{
+				//	var budgetRemining = fABudgetObjectVm.ListBudgetRemaining.Where(p => p.No == int.Parse(item)).SingleOrDefault()?.BudgetRemaining; Old
+					var budgetRemining = fABudgetEditVm.ListBudgetRemainingEdit.Where(p => p.No == int.Parse(item)).SingleOrDefault()?.BudgetRemaining;// new
+					if (budgetRemining != null)
+					{
+						if (fABudgetEditVm.CurrentInvestmentAmountUSD == null)
+						{
+							totalBudgetEdit += budgetRemining;
+						}
+						else
+						{
+							totalBudgetEdit = totalBudgetEdit + budgetRemining;
+
+						}
+					}
+				}
+				totalBudgetEdit = totalBudgetEdit + (fABudgetEditVm.CurrentInvestmentAmountUSD ?? 0);
+				//	fABudgetRequestVm.UpdateBudgetRemaining(total, value);
+				if (!string.IsNullOrEmpty(value))
+				{
+					// Loại bỏ khoảng trắng thừa giữa các dấu ','
+					string cleanedValue = string.Join(",", value.Split(',')
+																.Select(x => x.Trim()));
+
+					fABudgetEditVm.AppropriatedBudgetNo = cleanedValue;
+				}
+				else
+				{
+					fABudgetEditVm.AppropriatedBudgetNo = null;
+				}
+			}
+			else
+			{
+				//	fABudgetRequestVm.UpdateBudgetRemaining(null, null);
+				totalBudgetEdit = fABudgetEditVm.CurrentInvestmentAmountUSD;
+				fABudgetEditVm.AppropriatedBudgetNo = null;
+
+			}
+			UpdateValue(fABudgetEditVm.CurrentInvestmentAmountEstimationUSD);
+		}
+		catch (Exception ex)
+		{
+			snackbar.Add(ex.Message, Severity.Warning);
+		}
+
+
+
+	}
+	private decimal? OnListEditBudgetRemainingChanged(FABudgetRequestEditVm requestEditVm)
+	{
+		decimal? result = 0;
+		// Khi ListAddBudgetRemaining thay đổi, reset giá trị của Select
+		//	fABudgetRequestVm.AppropriatedBudgetNo = null; // Reset giá trị được chọn
+		if (string.IsNullOrEmpty(requestEditVm.AppropriatedBudgetNo))
+		{
+			optionsEdit = new List<string>();
+
+		}
+		else
+		{
+			//optionsEdit = new List<string>() { requestEditVm.AppropriatedBudgetNo }; // Reset danh sách selected values (nếu có)
+
+			optionsEdit = requestEditVm.AppropriatedBudgetNo.Split(',').Select(x => x.Trim()).ToArray();
+
+
+			if (fABudgetEditVm.CurrentInvestmentAmountUSD == null)
+			{
+				var _totalbudget = requestEditVm.BudgetCanUsing - requestEditVm.BudgetSharing;
+				fABudgetEditVm.BudgetCanUsing = requestEditVm.CurrentInvestmentAmountEstimationUSD + _totalbudget;
+				result = requestEditVm.CurrentInvestmentAmountEstimationUSD + _totalbudget;
+			}
+			else
+			{
+				var _totalbudget = fABudgetEditVm.CurrentInvestmentAmountEstimationUSD - fABudgetEditVm.CurrentInvestmentAmountUSD + requestEditVm.BudgetCanUsing - requestEditVm.BudgetSharing + fABudgetEditVm.CurrentInvestmentAmountUSD;
+				fABudgetEditVm.BudgetCanUsing = _totalbudget;
+				result = _totalbudget;
+			}
+		}
+
+		StateHasChanged(); // Cập nhật lại UI
+		return result;
+	}
+	private void OnListAddBudgetRemainingChanged()
+	{
+		// Khi ListAddBudgetRemaining thay đổi, reset giá trị của Select
+		fABudgetRequestVm.AppropriatedBudgetNo = null; // Reset giá trị được chọn
+		options = new List<string>(); // Reset danh sách selected values (nếu có)
+
+		StateHasChanged(); // Cập nhật lại UI
+	}
+	string styleRow = "max-content;";
+	private void OnRowsPerPageChanged(int newRowsPerPage)
+	{
+		//styleRow = newRowsPerPage;
+
+		// Kiểm tra nếu RowsPerPage là 25, set chiều cao là 1100px
+		if (newRowsPerPage >= 25)
+		{
+			styleRow = "1100px";
+		}
+		else
+		{
+			// Đặt chiều cao mặc định nếu khác 25
+			styleRow = "max-content;";
+		}
+	}
+
+	// PR dialog
+	private async Task OpenDialogAsync(string ringisho)
+	{
+		var options = new DialogOptions { CloseButton = true, CloseOnEscapeKey = true, DisableBackdropClick = true, MaxWidth = MaxWidth.ExtraExtraLarge, FullWidth = true };
+		var parameters = new DialogParameters { ["ringisho"] = ringisho };
+
+		var dialog = DialogService.Show<PurshaseRequest>("PurshaseRequest", parameters, options);
+
+
+		Console.WriteLine("Dialog");
+	}
+
+	// private async Task OpenEditDialog(int InvoiceId)
+	// {
+	// 	var options = new DialogOptions { CloseOnEscapeKey = true };
+	// 	var parameters = new DialogParameters { ["InvoiceId"] = InvoiceId };
+	// 	var dialog = DialogService.Show<EditInvoiceDialog>("Chỉnh sửa phiếu nhập", parameters, options);
+	// 	var dialogResult = await dialog.Result;
+	// 	if (!dialogResult.Canceled)
+	// 	{
+	// 		IsSearching = true;
+	// 		Invoices = await Mediator.Send(new GetInvoiceListQuery());
+	// 		IsSearching = false;
+	// 	}
+	// }
+
+	// Open Dialog UploadData
+	private async Task OpenDialogUploadDataAsync()
+	{
+		var options = new DialogOptions { CloseButton = true, CloseOnEscapeKey = true, DisableBackdropClick = true, MaxWidth = MaxWidth.Large, FullWidth = true };
+		var parameters = new DialogParameters { ["snackbar"] = snackbar, ["httpClient"] = httpClient };
+		// var parameters = new DialogParameters<UploadData>
+		// {
+		// 	{ x => x.snackbar, snackbar},
+		// 	{ x => x.httpClient, httpClient },
+		// };
+
+		var dialog = DialogService.Show<UploadData>("Upload Data", parameters, options);
+
+
+		Console.WriteLine("Dialog Upload Data");
+	}
+
+}

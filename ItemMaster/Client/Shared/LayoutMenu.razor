@@ -1,0 +1,25 @@
+﻿@inject NavigationManager NavigationManager
+@inject Providers.TokenAuthenticationStateProvider TokenAuthenticationStateProvider
+
+<AuthorizeView>
+    <Authorizing>
+        <text>...</text>
+    </Authorizing>
+    <Authorized>
+        <MudText Class="text-white"> @context.User.FindFirst("LastName").Value</MudText>
+        <MudButton Variant="Variant.Filled" StartIcon="@Icons.Filled.Logout" Color="Color.Info" OnClick="Logout" Size="Size.Small">Logout</MudButton>
+    </Authorized>
+    <NotAuthorized>
+        <MudIconButton Icon="@Icons.Filled.Login" Color="Color.Inherit" OnClick="NavigateToCounterComponent" Target="_blank" />
+    </NotAuthorized>
+</AuthorizeView>
+
+
+@code {
+    private void NavigateToCounterComponent() { NavigationManager.NavigateTo("/pages/authentication/login"); }
+    async Task Logout()
+    {
+        await TokenAuthenticationStateProvider.Logout();
+        NavigationManager.NavigateTo("/pages/authentication/login");
+    }
+}
