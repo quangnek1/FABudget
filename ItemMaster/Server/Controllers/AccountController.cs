@@ -43,8 +43,9 @@ namespace ItemMaster.Server.Controllers
         public async Task<IActionResult> ForgotPassword(InputModel request)
         {
             var response = await _authRepo.ForgotPasswordAsync(request);
+            Console.WriteLine($"ForgotPassword response: {response}");  
 
-            if (!response.IsSuccess)
+			if (!response.IsSuccess)
             {
                 return BadRequest(response);
             }

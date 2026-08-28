@@ -6,5 +6,6 @@ namespace ItemMaster.Server.Controllers
     [ApiController]
     public class BaseController : ControllerBase
 	{
+        
 	}
 }
