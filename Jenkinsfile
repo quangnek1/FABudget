@@ -20,7 +20,7 @@ pipeline {
             }
             steps {
                 echo 'Đang chạy các lệnh deploy cho môi trường Test/Staging...'
-                // Ví dụ: bat 'dotnet publish -c Release -o ./publish/staging'
+                // Ví dụ: bat 'dotnet publish -c Release -o ./publish/staging' ok tesst
             }
         }
 
