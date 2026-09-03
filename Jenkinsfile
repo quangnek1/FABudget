@@ -1,7 +1,7 @@
 pipeline {
     agent any
     stages {
-        // 1. Các bước chung: Chạy trên TẤT CẢ các nhánh
+        // 1. Các bước chung: Chạy trên TẤT CẢ các nhánh. ok chạy test
         stage('Restore') {
             steps {
                 bat 'dotnet restore'
