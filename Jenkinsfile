@@ -5,6 +5,7 @@ pipeline {
         stage('Restore') {
             steps {
                 bat 'dotnet restore'
+                // ok
             }
         }
         stage('Build') {
